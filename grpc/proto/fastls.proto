@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package fastls;
+
+option go_package = "github.com/FastTLS/fastls-rpc/grpc/proto";
+
+// Fastls gRPC服务
+service FastlsService {
+  // 健康检查
+  rpc Health(HealthRequest) returns (HealthResponse);
+  
+  // 发送HTTP请求
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+}
+
+// 健康检查请求
+message HealthRequest {
+}
+
+// 健康检查响应
+message HealthResponse {
+  string status = 1;
+}
+
+// HTTP请求
+message FetchRequest {
+  string url = 1;                    // 请求URL（必填）
+  string method = 2;                 // HTTP方法，默认GET
+  map<string, string> headers = 3;  // 请求头
+  string body = 4;                   // 请求体
+  string proxy = 5;                  // 代理地址
+  int32 timeout = 6;                 // 超时时间（秒），默认30
+  bool disable_redirect = 7;         // 是否禁用重定向
+  string user_agent = 8;             // User-Agent
+  Fingerprint fingerprint = 9;        // 指纹配置
+  string browser = 10;               // 浏览器类型
+  repeated Cookie cookies = 11;       // Cookie列表
+}
+
+// 指纹配置
+message Fingerprint {
+  string type = 1;   // 指纹类型: "ja3" 或 "ja4r"
+  string value = 2;  // 指纹值
+}
+
+// Cookie
+message Cookie {
+  string name = 1;
+  string value = 2;
+  string path = 3;
+  string domain = 4;
+  int64 expires = 5;  // Unix时间戳
+  bool http_only = 6;
+  bool secure = 7;
+}
+
+// HTTP响应
+message FetchResponse {
+  bool ok = 1;                        // 是否成功
+  int32 status = 2;                   // HTTP状态码
+  map<string, string> headers = 3;   // 响应头
+  string body = 4;                    // 响应体
+  string error = 5;                   // 错误信息（如果有）
+}
+
