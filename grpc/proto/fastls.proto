@@ -35,6 +35,8 @@ message FetchRequest {
   Fingerprint fingerprint = 9;        // 指纹配置
   string browser = 10;               // 浏览器类型
   repeated Cookie cookies = 11;       // Cookie列表
+  string http2_settings_string = 12; // HTTP/2设置字符串
+  string parent_proxy = 13;          // 上级代理地址（通过参数传递）
 }
 
 // 指纹配置

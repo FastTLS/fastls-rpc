@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 
 	fastls "github.com/FastTLS/fastls"
@@ -37,17 +39,19 @@ type RPCError struct {
 
 // FetchParams 请求参数
 type FetchParams struct {
-	URL             string            `json:"url" binding:"required"`
-	Method          string            `json:"method"`
-	Headers         map[string]string `json:"headers"`
-	Body            string            `json:"body"`
-	Proxy           string            `json:"proxy"`
-	Timeout         int               `json:"timeout"`
-	DisableRedirect bool              `json:"disableRedirect"`
-	UserAgent       string            `json:"userAgent"`
-	Fingerprint     map[string]string `json:"fingerprint"`
-	Browser         string            `json:"browser"`
-	Cookies         []fastls.Cookie   `json:"cookies"`
+	URL                 string            `json:"url" binding:"required"`
+	Method              string            `json:"method"`
+	Headers             map[string]string `json:"headers"`
+	Body                string            `json:"body"`
+	Proxy               string            `json:"proxy"`
+	Timeout             int               `json:"timeout"`
+	DisableRedirect     bool              `json:"disableRedirect"`
+	UserAgent           string            `json:"userAgent"`
+	Fingerprint         map[string]string `json:"fingerprint"`
+	Browser             string            `json:"browser"`
+	Cookies             []fastls.Cookie   `json:"cookies"`
+	HTTP2SettingsString string            `json:"http2_settings_string"`
+	ParentProxy         string            `json:"parent_proxy"`
 }
 
 // FetchResult 请求结果
@@ -167,51 +171,68 @@ func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError)
 		Cookies:         p.Cookies,
 	}
 
-	// 处理指纹
+	// 优先使用参数中的代理信息
+	if p.ParentProxy != "" {
+		options.Proxy = p.ParentProxy
+	} else if p.Proxy != "" {
+		options.Proxy = p.Proxy
+	}
+
+	// 构建指纹配置
+	requestConfig := &RequestFingerprintConfig{}
+
+	// 从参数中获取配置
+	if p.Browser != "" {
+		requestConfig.Browser = p.Browser
+		requestConfig.Override = true
+	}
 	if p.Fingerprint != nil {
 		fpType, hasType := p.Fingerprint["type"]
 		fpValue, hasValue := p.Fingerprint["value"]
 		if hasType && hasValue {
 			switch fpType {
 			case "ja3":
-				options.Fingerprint = fastls.Ja3Fingerprint{
-					FingerprintValue: fpValue,
-				}
+				requestConfig.JA3 = fpValue
+				requestConfig.Override = true
 			case "ja4", "ja4r":
-				options.Fingerprint = fastls.Ja4Fingerprint{
-					FingerprintValue: fpValue,
-				}
+				requestConfig.JA4R = fpValue
+				requestConfig.Override = true
 			}
 		}
 	}
-
-	// 如果没有指定指纹，根据浏览器类型设置指纹
-	if (options.Fingerprint == nil || options.Fingerprint.IsEmpty()) && p.Browser != "" {
-		switch p.Browser {
-		case "chrome":
-			imitate.Chrome(&options)
-		case "chrome120":
-			imitate.Chrome120(&options)
-		case "chrome142":
-			imitate.Chrome142(&options)
-		case "chromium":
-			imitate.Chromium(&options)
-		case "edge":
-			imitate.Edge(&options)
-		case "firefox":
-			imitate.Firefox(&options)
-		case "safari":
-			imitate.Safari(&options)
-		case "opera":
-			imitate.Opera(&options)
-		default:
-			imitate.Firefox(&options)
-		}
+	if p.HTTP2SettingsString != "" {
+		requestConfig.HTTP2SettingsString = p.HTTP2SettingsString
+		requestConfig.Override = true
 	}
 
-	// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
-	if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
-		imitate.Firefox(&options)
+	// 应用指纹配置
+	if requestConfig.Override {
+		applyImitateConfig(&options, requestConfig)
+
+		// 优先使用参数中的 HTTP2SettingsString
+		if requestConfig.HTTP2SettingsString != "" {
+			options.HTTP2SettingsString = requestConfig.HTTP2SettingsString
+		}
+
+		// 如果 HTTP2SettingsString 不为空，则解析并覆盖 HTTP2Settings 和 PHeaderOrderKeys
+		if options.HTTP2SettingsString != "" {
+			h2Settings, pHeaderOrderKeys, err := fastls.ParseH2SettingsStringWithPHeaderOrder(options.HTTP2SettingsString)
+			if err != nil {
+				log.Printf("解析 HTTP2SettingsString 失败: %v", err)
+			} else {
+				// 覆盖 HTTP2Settings
+				options.HTTP2Settings = fastls.ToHTTP2Settings(h2Settings)
+				// 如果解析出 PHeaderOrderKeys，则覆盖
+				if len(pHeaderOrderKeys) > 0 {
+					options.PHeaderOrderKeys = pHeaderOrderKeys
+				}
+			}
+		}
+	} else {
+		// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
+		if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
+			imitate.Firefox(&options)
+		}
 	}
 
 	// 执行请求
@@ -268,6 +289,42 @@ func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError)
 }
 
 func main() {
+	var (
+		addr        string
+		debug       bool
+		showVersion bool
+		showHelp    bool
+	)
+
+	// 定义完整参数和缩写参数
+	flag.StringVar(&addr, "addr", ":8801", "监听地址 (例如: :8801 或 0.0.0.0:8801)")
+	flag.StringVar(&addr, "a", ":8801", "监听地址 (addr 的缩写)")
+
+	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
+	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
+
+	flag.BoolVar(&showVersion, "version", false, "显示版本信息并退出")
+	flag.BoolVar(&showVersion, "v", false, "显示版本信息并退出 (version 的缩写)")
+
+	flag.BoolVar(&showHelp, "help", false, "显示帮助信息并退出")
+	flag.BoolVar(&showHelp, "h", false, "显示帮助信息并退出 (help 的缩写)")
+
+	flag.Usage = func() {
+		printHelp()
+	}
+
+	flag.Parse()
+
+	if showHelp || len(os.Args) > 1 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
+		printHelp()
+		os.Exit(0)
+	}
+
+	if showVersion {
+		printVersion()
+		os.Exit(0)
+	}
+
 	// 设置最大CPU核心数
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -275,7 +332,11 @@ func main() {
 	rpcServer := NewRPCServer()
 
 	// 创建gin路由
-	gin.SetMode(gin.ReleaseMode)
+	if debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.Default()
 
 	// 添加CORS中间件
@@ -290,10 +351,9 @@ func main() {
 	r.POST("/rpc", rpcServer.handleRPC)
 
 	// 启动服务器
-	port := ":8801"
-	log.Printf("RPC服务启动在端口 %s", port)
-	log.Printf("RPC端点: http://localhost%s/rpc", port)
-	if err := r.Run(port); err != nil {
+	log.Printf("RPC服务启动在端口 %s", addr)
+	log.Printf("RPC端点: http://localhost%s/rpc", addr)
+	if err := r.Run(addr); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
 }
