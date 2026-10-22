@@ -1,0 +1,36 @@
+package main
+
+import "fmt"
+
+func printHelp() {
+	fmt.Printf("Fastls gRPC Service - gRPC 请求服务\n\n")
+	fmt.Printf("用法:\n")
+	fmt.Printf("  fastls-grpc [选项]\n\n")
+	fmt.Printf("选项:\n")
+	fmt.Printf("  -addr, -a string\n")
+	fmt.Printf("        监听地址 (默认: \":8802\")\n")
+	fmt.Printf("        示例: -addr \":8802\" 或 -a \"0.0.0.0:8802\"\n\n")
+	fmt.Printf("  -debug, -d\n")
+	fmt.Printf("        启用 Debug 模式，显示详细的调试日志\n\n")
+	fmt.Printf("  -version, -v\n")
+	fmt.Printf("        显示版本信息并退出\n\n")
+	fmt.Printf("  -help, -h\n")
+	fmt.Printf("        显示此帮助信息并退出\n\n")
+	fmt.Printf("gRPC 方法:\n")
+	fmt.Printf("  Health()      - 健康检查\n")
+	fmt.Printf("  Fetch()        - 发送 HTTP 请求\n\n")
+	fmt.Printf("请求参数配置:\n")
+	fmt.Printf("  可以通过 FetchRequest 参数配置指纹和代理:\n")
+	fmt.Printf("  browser:           浏览器类型 (chrome/chrome160(latest), chrome150..chrome160, chrome120, chrome142, chromium, edge/edge160(latest), edge150..edge160, firefox/firefox158(latest), firefox151..firefox158, firefox144/147/148, safari, opera)\n")
+	fmt.Printf("  fingerprint:       指纹配置 (type: \"ja3\" 或 \"ja4r\", value: 指纹字符串)\n")
+	fmt.Printf("  http2_settings_string: HTTP/2设置字符串\n")
+	fmt.Printf("  parent_proxy:      上级代理地址 (格式: http://proxy.com:8080 或 http://user:pass@proxy.com:8080)\n\n")
+	fmt.Printf("示例:\n")
+	fmt.Printf("  fastls-grpc -addr :8802\n")
+	fmt.Printf("  fastls-grpc -a :8802 -d\n")
+	fmt.Printf("  fastls-grpc -version\n")
+	fmt.Printf("  fastls-grpc -v\n")
+	fmt.Printf("  fastls-grpc -help\n")
+	fmt.Printf("  fastls-grpc -h\n\n")
+	fmt.Printf("更多信息请访问: https://github.com/FastTLS/fastls\n")
+}
