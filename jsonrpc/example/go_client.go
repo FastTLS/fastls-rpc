@@ -34,17 +34,19 @@ type RPCError struct {
 
 // FetchParams 请求参数
 type FetchParams struct {
-	URL             string            `json:"url"`
-	Method          string            `json:"method,omitempty"`
-	Headers         map[string]string `json:"headers,omitempty"`
-	Body            string            `json:"body,omitempty"`
-	Proxy           string            `json:"proxy,omitempty"`
-	Timeout         int               `json:"timeout,omitempty"`
-	DisableRedirect bool              `json:"disableRedirect,omitempty"`
-	UserAgent       string            `json:"userAgent,omitempty"`
-	Fingerprint     map[string]string `json:"fingerprint,omitempty"`
-	Browser         string            `json:"browser,omitempty"`
-	Cookies         []interface{}     `json:"cookies,omitempty"`
+	URL                 string            `json:"url"`
+	Method              string            `json:"method,omitempty"`
+	Headers             map[string]string `json:"headers,omitempty"`
+	Body                string            `json:"body,omitempty"`
+	Proxy               string            `json:"proxy,omitempty"`
+	Timeout             int               `json:"timeout,omitempty"`
+	DisableRedirect     bool              `json:"disableRedirect,omitempty"`
+	UserAgent           string            `json:"userAgent,omitempty"`
+	Fingerprint         map[string]string `json:"fingerprint,omitempty"`
+	Browser             string            `json:"browser,omitempty"`
+	Cookies             []interface{}     `json:"cookies,omitempty"`
+	HTTP2SettingsString string            `json:"http2_settings_string,omitempty"`
+	ParentProxy         string            `json:"parent_proxy,omitempty"`
 }
 
 // FastlsRPCClient RPC客户端

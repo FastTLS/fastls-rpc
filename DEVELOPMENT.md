@@ -32,15 +32,20 @@ go build -o build/fastls-grpc ./grpc
 
 ## Protobuf 变更
 
-`grpc/proto/fastls.proto` 是接口源。当前生成基线为 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0。只有 `.proto` 变化或修复生成文件时才重新生成：
+`grpc/proto/fastls.proto` 是接口源。当前 Go 生成基线为 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0；Python 生成基线为 `grpcio-tools` 1.76.0（Protobuf Python 6.31.1）。只有 `.proto` 变化或修复生成文件时才重新生成：
 
 ```bash
 protoc --go_out=. --go_opt=paths=source_relative \
   --go-grpc_out=. --go-grpc_opt=paths=source_relative \
   grpc/proto/fastls.proto
+
+python -m grpc_tools.protoc -I grpc/proto \
+  --python_out=grpc/grpc_example \
+  --grpc_python_out=grpc/grpc_example \
+  grpc/proto/fastls.proto
 ```
 
-提交时同时包含源文件、生成文件和兼容性说明。不要手工修改生成文件；生成器版本不得高于运行时依赖 `google.golang.org/protobuf`。
+提交时同时包含源文件、Go/Python 生成文件和兼容性说明。不要手工修改生成文件；Go 生成器版本不得高于运行时依赖 `google.golang.org/protobuf`。
 
 ## CI 门禁
 

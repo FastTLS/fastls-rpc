@@ -64,6 +64,8 @@ gRPC 的权威接口定义位于 [`grpc/proto/fastls.proto`](./grpc/proto/fastls
 
 建议优先使用稳定别名 `chrome`、`edge`、`firefox`、`safari`、`opera` 或 `chromium`；需要固定实验条件时可以使用版本化选择器。显式 JA3/JA4R 高于 `browser`，未设置时使用默认浏览器配置。无效选择器会返回可诊断错误。
 
+JSON-RPC 与 gRPC 共用同一请求执行层和字段优先级：`parent_proxy` > `proxy`，显式 HTTP/2 设置覆盖浏览器预设，调用取消会传递到下游连接。两种协议对无效指纹及 HTTP/2 设置分别返回 `-32602` 与 `INVALID_ARGUMENT`，避免同一请求在两个入口出现不同结果。
+
 ```text
 fastls-rpc
   ├─ jsonrpc / grpc
@@ -86,6 +88,8 @@ go build ./...
 ```
 
 GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依赖策略、单元/集成测试、竞态检测、覆盖率、静态检查、两种服务构建和 CLI 冒烟测试。`main` 分支会生成同时包含两个二进制的六个平台开发包、SHA-256 校验和与 Sigstore/GitHub 来源证明，并在上传前完成验证。
+
+本地集成测试共用环回目标与 CONNECT 代理夹具，覆盖请求体/请求头/Cookie、压缩响应、禁用重定向、代理优先级、取消传播，以及两个 RPC 适配层的字段映射；不访问公网。
 
 ## 文档索引
 

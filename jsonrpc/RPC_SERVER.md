@@ -103,12 +103,16 @@ go build -o fastls-jsonrpc.exe ./jsonrpc
 | headers | object | 否 | 请求头 |
 | body | string | 否 | 请求体 |
 | proxy | string | 否 | 代理地址 |
+| parent_proxy | string | 否 | 上级代理地址；设置后覆盖 `proxy` |
 | timeout | int | 否 | 超时时间（秒），默认 30 |
 | disableRedirect | bool | 否 | 是否禁用重定向，默认 false |
 | userAgent | string | 否 | User-Agent |
 | fingerprint | object | 否 | 指纹配置，格式：`{"type": "ja3", "value": "..."}` 或 `{"type": "ja4r", "value": "..."}` |
 | browser | string | 否 | 浏览器类型 |
 | cookies | array | 否 | Cookie列表 |
+| http2_settings_string | string | 否 | HTTP/2 SETTINGS、窗口及伪头顺序字符串；设置后覆盖浏览器预设值 |
+
+请求契约与 gRPC 服务一致：`parent_proxy` > `proxy`，显式 `userAgent` 覆盖浏览器生成值（`headers.User-Agent` 仍最高），显式 `http2_settings_string` 覆盖浏览器预设。字段不完整、类型不支持或 HTTP/2 设置无法解析时返回 `-32602 Invalid params`。客户端取消 JSON-RPC HTTP 请求时，下游请求同步取消。
 
 **支持的浏览器类型:**
 

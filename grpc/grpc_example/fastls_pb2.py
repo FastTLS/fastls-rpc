@@ -24,14 +24,14 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x66\x61stls.proto\x12\x06\x66\x61stls\"\x0f\n\rHealthRequest\" \n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"\xc7\x02\n\x0c\x46\x65tchRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12\x32\n\x07headers\x18\x03 \x03(\x0b\x32!.fastls.FetchRequest.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05proxy\x18\x05 \x01(\t\x12\x0f\n\x07timeout\x18\x06 \x01(\x05\x12\x18\n\x10\x64isable_redirect\x18\x07 \x01(\x08\x12\x12\n\nuser_agent\x18\x08 \x01(\t\x12(\n\x0b\x66ingerprint\x18\t \x01(\x0b\x32\x13.fastls.Fingerprint\x12\x0f\n\x07\x62rowser\x18\n \x01(\t\x12\x1f\n\x07\x63ookies\x18\x0b \x03(\x0b\x32\x0e.fastls.Cookie\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"*\n\x0b\x46ingerprint\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x06\x43ookie\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0e\n\x06\x64omain\x18\x04 \x01(\t\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\thttp_only\x18\x06 \x01(\x08\x12\x0e\n\x06secure\x18\x07 \x01(\x08\"\xad\x01\n\rFetchResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0e\n\x06status\x18\x02 \x01(\x05\x12\x33\n\x07headers\x18\x03 \x03(\x0b\x32\".fastls.FetchResponse.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x32~\n\rFastlsService\x12\x37\n\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x12\x34\n\x05\x46\x65tch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB3Z1github.com/ChengHoward/Fastls/main/rpc/grpc/protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x66\x61stls.proto\x12\x06\x66\x61stls\"\x0f\n\rHealthRequest\" \n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"\xfc\x02\n\x0c\x46\x65tchRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12\x32\n\x07headers\x18\x03 \x03(\x0b\x32!.fastls.FetchRequest.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05proxy\x18\x05 \x01(\t\x12\x0f\n\x07timeout\x18\x06 \x01(\x05\x12\x18\n\x10\x64isable_redirect\x18\x07 \x01(\x08\x12\x12\n\nuser_agent\x18\x08 \x01(\t\x12(\n\x0b\x66ingerprint\x18\t \x01(\x0b\x32\x13.fastls.Fingerprint\x12\x0f\n\x07\x62rowser\x18\n \x01(\t\x12\x1f\n\x07\x63ookies\x18\x0b \x03(\x0b\x32\x0e.fastls.Cookie\x12\x1d\n\x15http2_settings_string\x18\x0c \x01(\t\x12\x14\n\x0cparent_proxy\x18\r \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"*\n\x0b\x46ingerprint\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x06\x43ookie\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0e\n\x06\x64omain\x18\x04 \x01(\t\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\thttp_only\x18\x06 \x01(\x08\x12\x0e\n\x06secure\x18\x07 \x01(\x08\"\xad\x01\n\rFetchResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0e\n\x06status\x18\x02 \x01(\x05\x12\x33\n\x07headers\x18\x03 \x03(\x0b\x32\".fastls.FetchResponse.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x32~\n\rFastlsService\x12\x37\n\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x12\x34\n\x05\x46\x65tch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB*Z(github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'fastls_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'Z1github.com/FastTLS/fastls-rpc/grpc/proto'
+  _globals['DESCRIPTOR']._serialized_options = b'Z(github.com/FastTLS/fastls-rpc/grpc/proto'
   _globals['_FETCHREQUEST_HEADERSENTRY']._loaded_options = None
   _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_options = b'8\001'
   _globals['_FETCHRESPONSE_HEADERSENTRY']._loaded_options = None
@@ -41,17 +41,17 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_HEALTHRESPONSE']._serialized_start=41
   _globals['_HEALTHRESPONSE']._serialized_end=73
   _globals['_FETCHREQUEST']._serialized_start=76
-  _globals['_FETCHREQUEST']._serialized_end=403
-  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_start=357
-  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_end=403
-  _globals['_FINGERPRINT']._serialized_start=405
-  _globals['_FINGERPRINT']._serialized_end=447
-  _globals['_COOKIE']._serialized_start=449
-  _globals['_COOKIE']._serialized_end=568
-  _globals['_FETCHRESPONSE']._serialized_start=571
-  _globals['_FETCHRESPONSE']._serialized_end=744
-  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_start=357
-  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_end=403
-  _globals['_FASTLSSERVICE']._serialized_start=746
-  _globals['_FASTLSSERVICE']._serialized_end=872
+  _globals['_FETCHREQUEST']._serialized_end=456
+  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_start=410
+  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_end=456
+  _globals['_FINGERPRINT']._serialized_start=458
+  _globals['_FINGERPRINT']._serialized_end=500
+  _globals['_COOKIE']._serialized_start=502
+  _globals['_COOKIE']._serialized_end=621
+  _globals['_FETCHRESPONSE']._serialized_start=624
+  _globals['_FETCHRESPONSE']._serialized_end=797
+  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_start=410
+  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_end=456
+  _globals['_FASTLSSERVICE']._serialized_start=799
+  _globals['_FASTLSSERVICE']._serialized_end=925
 # @@protoc_insertion_point(module_scope)

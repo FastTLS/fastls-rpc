@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"runtime"
 
 	fastls "github.com/FastTLS/fastls"
+	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
 	"github.com/gin-gonic/gin"
 )
 
@@ -111,7 +112,7 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 
 	switch req.Method {
 	case "fetch":
-		result, rpcErr = s.handleFetch(req.Params)
+		result, rpcErr = s.handleFetch(c.Request.Context(), req.Params)
 	case "health":
 		result = map[string]string{"status": "ok"}
 	default:
@@ -138,7 +139,7 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 }
 
 // handleFetch 处理fetch请求
-func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError) {
+func (s *RPCServer) handleFetch(ctx context.Context, params json.RawMessage) (interface{}, *RPCError) {
 	var p FetchParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, &RPCError{
@@ -148,147 +149,26 @@ func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError)
 		}
 	}
 
-	// 设置默认值
-	if p.Method == "" {
-		p.Method = "GET"
-	}
-	if p.Timeout == 0 {
-		p.Timeout = 30
-	}
-	if p.Headers == nil {
-		p.Headers = make(map[string]string)
-	}
-
-	// 构建Fastls选项
-	options := fastls.Options{
-		Headers:         p.Headers,
-		Body:            p.Body,
-		Proxy:           p.Proxy,
-		Timeout:         p.Timeout,
-		DisableRedirect: p.DisableRedirect,
-		UserAgent:       p.UserAgent,
-		Cookies:         p.Cookies,
-	}
-
-	// 优先使用参数中的代理信息
-	if p.ParentProxy != "" {
-		options.Proxy = p.ParentProxy
-	} else if p.Proxy != "" {
-		options.Proxy = p.Proxy
-	}
-
-	// 构建指纹配置
-	requestConfig := &RequestFingerprintConfig{}
-
-	// 从参数中获取配置
-	if p.Browser != "" {
-		requestConfig.Browser = p.Browser
-		requestConfig.Override = true
-	}
+	fingerprintType, fingerprintValue := "", ""
 	if p.Fingerprint != nil {
-		fpType, hasType := p.Fingerprint["type"]
-		fpValue, hasValue := p.Fingerprint["value"]
-		if hasType && hasValue {
-			switch fpType {
-			case "ja3":
-				requestConfig.JA3 = fpValue
-				requestConfig.Override = true
-			case "ja4", "ja4r":
-				requestConfig.JA4R = fpValue
-				requestConfig.Override = true
-			}
-		}
+		fingerprintType = p.Fingerprint["type"]
+		fingerprintValue = p.Fingerprint["value"]
 	}
-	if p.HTTP2SettingsString != "" {
-		requestConfig.HTTP2SettingsString = p.HTTP2SettingsString
-		requestConfig.Override = true
-	}
-
-	// 应用指纹配置
-	if requestConfig.Override {
-		if err := applyImitateConfig(&options, requestConfig); err != nil {
-			return nil, &RPCError{Code: -32602, Message: "Invalid browser fingerprint", Data: err.Error()}
-		}
-
-		// 优先使用参数中的 HTTP2SettingsString
-		if requestConfig.HTTP2SettingsString != "" {
-			options.HTTP2SettingsString = requestConfig.HTTP2SettingsString
-		}
-
-		// 如果 HTTP2SettingsString 不为空，则解析并覆盖 HTTP2Settings 和 PHeaderOrderKeys
-		if options.HTTP2SettingsString != "" {
-			h2Settings, pHeaderOrderKeys, err := fastls.ParseH2SettingsStringWithPHeaderOrder(options.HTTP2SettingsString)
-			if err != nil {
-				log.Printf("解析 HTTP2SettingsString 失败: %v", err)
-			} else {
-				// 覆盖 HTTP2Settings
-				options.HTTP2Settings = fastls.ToHTTP2Settings(h2Settings)
-				// 如果解析出 PHeaderOrderKeys，则覆盖
-				if len(pHeaderOrderKeys) > 0 {
-					options.PHeaderOrderKeys = pHeaderOrderKeys
-				}
-			}
-		}
-	} else {
-		// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
-		if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
-			if err := applyBrowserImitate(&options, "firefox"); err != nil {
-				return nil, &RPCError{Code: -32603, Message: "Default browser fingerprint unavailable", Data: err.Error()}
-			}
-		}
-	}
-
-	// 执行请求
-	resp, err := s.client.Do(p.URL, options, p.Method)
-
-	// 处理错误
+	result, err := fetchservice.Fetch(ctx, s.client, fetchservice.Params{
+		URL: p.URL, Method: p.Method, Headers: p.Headers, Body: p.Body,
+		Proxy: p.Proxy, ParentProxy: p.ParentProxy, Timeout: p.Timeout,
+		DisableRedirect: p.DisableRedirect, UserAgent: p.UserAgent,
+		FingerprintSet: p.Fingerprint != nil, FingerprintType: fingerprintType, FingerprintValue: fingerprintValue,
+		Browser: p.Browser, Cookies: p.Cookies,
+		HTTP2SettingsString: p.HTTP2SettingsString,
+	})
 	if err != nil {
-		status := 0
-		if resp.Body != nil {
-			resp.Body.Close()
+		if _, ok := err.(*fetchservice.ConfigError); ok {
+			return nil, &RPCError{Code: -32602, Message: "Invalid params", Data: err.Error()}
 		}
-		return FetchResult{
-			OK:     false,
-			Status: status,
-			Error:  err.Error(),
-		}, nil
+		return nil, &RPCError{Code: -32603, Message: "Internal error", Data: err.Error()}
 	}
-
-	// 确保响应体被关闭
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
-	// 读取响应体
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return FetchResult{
-			OK:     false,
-			Status: resp.Status,
-			Error:  "读取响应体失败: " + err.Error(),
-		}, nil
-	}
-
-	// 解码响应体
-	contentEncoding := resp.Headers["Content-Encoding"]
-	var decodedBody string
-	if contentEncoding != "" {
-		decodedBody = fastls.DecompressBody(bodyBytes, []string{contentEncoding}, nil)
-	} else {
-		contentType := resp.Headers["Content-Type"]
-		if contentType != "" {
-			decodedBody = fastls.DecompressBody(bodyBytes, nil, []string{contentType})
-		} else {
-			decodedBody = string(bodyBytes)
-		}
-	}
-
-	return FetchResult{
-		OK:      true,
-		Status:  resp.Status,
-		Headers: resp.Headers,
-		Body:    decodedBody,
-	}, nil
+	return FetchResult(result), nil
 }
 
 func main() {

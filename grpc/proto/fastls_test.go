@@ -1,6 +1,9 @@
 package proto
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -12,7 +15,7 @@ func TestFetchRequestDescriptorAndRoundTrip(t *testing.T) {
 		Url:                 "https://example.com/",
 		Method:              "GET",
 		Browser:             "chrome",
-		Http2SettingsString: "1:65536|15663105|0|m,a,s,p",
+		Http2SettingsString: "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p",
 		ParentProxy:         "http://127.0.0.1:8080",
 	}
 
@@ -42,5 +45,18 @@ func TestFetchRequestDescriptorAndRoundTrip(t *testing.T) {
 	}
 	if !proto.Equal(request, &decoded) {
 		t.Fatalf("round trip mismatch: got %v, want %v", &decoded, request)
+	}
+}
+
+func TestCheckedInPythonDescriptorIncludesCurrentFields(t *testing.T) {
+	generatedPath := filepath.Join("..", "grpc_example", "fastls_pb2.py")
+	contents, err := os.ReadFile(generatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"http2_settings_string", "parent_proxy"} {
+		if !strings.Contains(string(contents), field) {
+			t.Fatalf("%s is missing %q; regenerate Python protobuf files", generatedPath, field)
+		}
 	}
 }

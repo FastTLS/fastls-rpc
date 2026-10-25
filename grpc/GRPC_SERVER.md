@@ -73,12 +73,16 @@ message HealthResponse {
 | headers | map<string, string> | 请求头 |
 | body | string | 请求体 |
 | proxy | string | 代理地址 |
+| parent_proxy | string | 上级代理地址；设置后覆盖 `proxy` |
 | timeout | int32 | 超时时间（秒），默认 30 |
 | disable_redirect | bool | 是否禁用重定向 |
 | user_agent | string | User-Agent |
 | fingerprint | Fingerprint | 指纹配置 |
 | browser | string | 浏览器类型 |
 | cookies | repeated Cookie | Cookie列表 |
+| http2_settings_string | string | HTTP/2 SETTINGS、窗口及伪头顺序字符串；设置后覆盖浏览器预设值 |
+
+请求契约与 JSON-RPC 服务一致：`parent_proxy` > `proxy`，显式 `user_agent` 覆盖浏览器生成值（`headers["User-Agent"]` 仍最高），显式 `http2_settings_string` 覆盖浏览器预设。字段不完整、类型不支持或 HTTP/2 设置无法解析时返回 `INVALID_ARGUMENT`。gRPC context 取消时，下游请求同步取消。
 
 **响应:**
 

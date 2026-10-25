@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	fastls "github.com/FastTLS/fastls"
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
+	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,16 +39,6 @@ func (s *GRPCServer) Health(ctx context.Context, req *pb.HealthRequest) (*pb.Hea
 
 // Fetch 发送HTTP请求
 func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.FetchResponse, error) {
-	// 设置默认值
-	method := req.Method
-	if method == "" {
-		method = "GET"
-	}
-	timeout := int(req.Timeout)
-	if timeout == 0 {
-		timeout = 30
-	}
-
 	// 构建请求头
 	headers := make(map[string]string)
 	for k, v := range req.Headers {
@@ -73,130 +63,28 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 		})
 	}
 
-	// 构建Fastls选项
-	options := fastls.Options{
-		Headers:         headers,
-		Body:            req.Body,
-		Proxy:           req.Proxy,
-		Timeout:         timeout,
-		DisableRedirect: req.DisableRedirect,
-		UserAgent:       req.UserAgent,
-		Cookies:         cookies,
-	}
-
-	// 优先使用参数中的代理信息
-	// 注意：proto 文件已更新，需要重新生成 Go 代码才能使用新字段
-	// 生成命令: cd grpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/fastls.proto
-	if req.Proxy != "" {
-		options.Proxy = req.Proxy
-	}
-	// TODO: 重新生成 proto 后启用
-	// if req.ParentProxy != "" {
-	// 	options.Proxy = req.ParentProxy
-	// }
-
-	// 构建指纹配置（优先级：参数中的配置 > 请求体中的配置）
-	requestConfig := &RequestFingerprintConfig{}
-
-	// 优先使用参数中的配置
-	if req.Browser != "" {
-		requestConfig.Browser = req.Browser
-		requestConfig.Override = true
-	}
+	fingerprintType, fingerprintValue := "", ""
 	if req.Fingerprint != nil {
-		switch req.Fingerprint.Type {
-		case "ja3":
-			requestConfig.JA3 = req.Fingerprint.Value
-			requestConfig.Override = true
-		case "ja4", "ja4r":
-			requestConfig.JA4R = req.Fingerprint.Value
-			requestConfig.Override = true
-		}
+		fingerprintType = req.Fingerprint.Type
+		fingerprintValue = req.Fingerprint.Value
 	}
-	// TODO: 重新生成 proto 后启用
-	// if req.Http2SettingsString != "" {
-	// 	requestConfig.HTTP2SettingsString = req.Http2SettingsString
-	// 	requestConfig.Override = true
-	// }
-
-	// 应用指纹配置
-	if requestConfig.Override {
-		if err := applyImitateConfig(&options, requestConfig); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "浏览器指纹配置错误: %v", err)
-		}
-
-		// 优先使用参数中的 HTTP2SettingsString
-		if requestConfig.HTTP2SettingsString != "" {
-			options.HTTP2SettingsString = requestConfig.HTTP2SettingsString
-		}
-
-		// 如果 HTTP2SettingsString 不为空，则解析并覆盖 HTTP2Settings 和 PHeaderOrderKeys
-		if options.HTTP2SettingsString != "" {
-			h2Settings, pHeaderOrderKeys, err := fastls.ParseH2SettingsStringWithPHeaderOrder(options.HTTP2SettingsString)
-			if err != nil {
-				log.Printf("解析 HTTP2SettingsString 失败: %v", err)
-			} else {
-				// 覆盖 HTTP2Settings
-				options.HTTP2Settings = fastls.ToHTTP2Settings(h2Settings)
-				// 如果解析出 PHeaderOrderKeys，则覆盖
-				if len(pHeaderOrderKeys) > 0 {
-					options.PHeaderOrderKeys = pHeaderOrderKeys
-				}
-			}
-		}
-	} else {
-		// 如果没有参数配置，使用默认逻辑
-		// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
-		if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
-			if err := applyBrowserImitate(&options, "firefox"); err != nil {
-				return nil, status.Errorf(codes.Internal, "默认浏览器指纹不可用: %v", err)
-			}
-		}
-	}
-
-	// 执行请求
-	resp, err := s.client.Do(req.Url, options, method)
-
-	// 处理错误
+	result, err := fetchservice.Fetch(ctx, s.client, fetchservice.Params{
+		URL: req.Url, Method: req.Method, Headers: headers, Body: req.Body,
+		Proxy: req.Proxy, ParentProxy: req.ParentProxy, Timeout: int(req.Timeout),
+		DisableRedirect: req.DisableRedirect, UserAgent: req.UserAgent,
+		FingerprintSet: req.Fingerprint != nil, FingerprintType: fingerprintType, FingerprintValue: fingerprintValue,
+		Browser: req.Browser, Cookies: cookies,
+		HTTP2SettingsString: req.Http2SettingsString,
+	})
 	if err != nil {
-		return &pb.FetchResponse{
-			Ok:     false,
-			Status: 0,
-			Error:  err.Error(),
-		}, nil
-	}
-
-	// 确保响应体被关闭
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
-	// 读取响应体
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "读取响应体失败: %v", err)
-	}
-
-	// 解码响应体
-	contentEncoding := resp.Headers["Content-Encoding"]
-	var decodedBody string
-	if contentEncoding != "" {
-		decodedBody = fastls.DecompressBody(bodyBytes, []string{contentEncoding}, nil)
-	} else {
-		contentType := resp.Headers["Content-Type"]
-		if contentType != "" {
-			decodedBody = fastls.DecompressBody(bodyBytes, nil, []string{contentType})
-		} else {
-			decodedBody = string(bodyBytes)
+		if _, ok := err.(*fetchservice.ConfigError); ok {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	// 构建响应
 	return &pb.FetchResponse{
-		Ok:      true,
-		Status:  int32(resp.Status),
-		Headers: resp.Headers,
-		Body:    decodedBody,
+		Ok: result.OK, Status: int32(result.Status), Headers: result.Headers,
+		Body: result.Body, Error: result.Error,
 	}, nil
 }
 
