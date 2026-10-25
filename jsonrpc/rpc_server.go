@@ -10,7 +10,6 @@ import (
 	"runtime"
 
 	fastls "github.com/FastTLS/fastls"
-	"github.com/FastTLS/fastls/imitate"
 	"github.com/gin-gonic/gin"
 )
 
@@ -207,7 +206,9 @@ func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError)
 
 	// 应用指纹配置
 	if requestConfig.Override {
-		applyImitateConfig(&options, requestConfig)
+		if err := applyImitateConfig(&options, requestConfig); err != nil {
+			return nil, &RPCError{Code: -32602, Message: "Invalid browser fingerprint", Data: err.Error()}
+		}
 
 		// 优先使用参数中的 HTTP2SettingsString
 		if requestConfig.HTTP2SettingsString != "" {
@@ -231,7 +232,9 @@ func (s *RPCServer) handleFetch(params json.RawMessage) (interface{}, *RPCError)
 	} else {
 		// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
 		if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
-			imitate.Firefox(&options)
+			if err := applyBrowserImitate(&options, "firefox"); err != nil {
+				return nil, &RPCError{Code: -32603, Message: "Default browser fingerprint unavailable", Data: err.Error()}
+			}
 		}
 	}
 

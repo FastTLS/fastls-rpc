@@ -12,7 +12,6 @@ import (
 
 	fastls "github.com/FastTLS/fastls"
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
-	"github.com/FastTLS/fastls/imitate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -122,7 +121,9 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 
 	// 应用指纹配置
 	if requestConfig.Override {
-		applyImitateConfig(&options, requestConfig)
+		if err := applyImitateConfig(&options, requestConfig); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "浏览器指纹配置错误: %v", err)
+		}
 
 		// 优先使用参数中的 HTTP2SettingsString
 		if requestConfig.HTTP2SettingsString != "" {
@@ -147,7 +148,9 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 		// 如果没有参数配置，使用默认逻辑
 		// 如果既没有指定指纹也没有指定浏览器，使用默认Firefox指纹
 		if options.Fingerprint == nil || options.Fingerprint.IsEmpty() {
-			imitate.Firefox(&options)
+			if err := applyBrowserImitate(&options, "firefox"); err != nil {
+				return nil, status.Errorf(codes.Internal, "默认浏览器指纹不可用: %v", err)
+			}
 		}
 	}
 
