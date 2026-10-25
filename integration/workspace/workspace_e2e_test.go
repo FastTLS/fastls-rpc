@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -19,6 +21,82 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+func TestWorkspaceDependencyAlignment(t *testing.T) {
+	rpcRoot, workspaceRoot := workspaceDirectories(t)
+	repositories := []struct {
+		name       string
+		root       string
+		modulePath string
+	}{
+		{name: "fastls-fetch", root: filepath.Join(workspaceRoot, "fastls-fetch-ftransport"), modulePath: "github.com/FastTLS/fastls-fetch"},
+		{name: "fastls-rpc", root: rpcRoot, modulePath: "github.com/FastTLS/fastls-rpc"},
+		{name: "fastls-mitm", root: filepath.Join(workspaceRoot, "fastls-mitm-ftransport"), modulePath: "github.com/FastTLS/fastls-mitm"},
+	}
+	sharedDependencies := []string{
+		"github.com/FastTLS/fastls",
+		"github.com/FastTLS/fastls/profile",
+		"github.com/FastTLS/ftransport",
+		"github.com/FastTLS/imitate",
+	}
+
+	expectedVersions := make(map[string]string, len(sharedDependencies))
+	for _, repository := range repositories {
+		manifest := readGoMod(t, repository.root)
+		if manifest.Module.Path != repository.modulePath {
+			t.Errorf("%s module path: got %q, want %q", repository.name, manifest.Module.Path, repository.modulePath)
+		}
+		if len(manifest.Replace) != 0 {
+			t.Errorf("%s contains replace directives; workspace compatibility must use publishable dependencies", repository.name)
+		}
+
+		requirements := make(map[string]string, len(manifest.Require))
+		for _, requirement := range manifest.Require {
+			requirements[requirement.Path] = requirement.Version
+		}
+		for _, dependency := range sharedDependencies {
+			version, ok := requirements[dependency]
+			if !ok {
+				t.Errorf("%s does not require %s", repository.name, dependency)
+				continue
+			}
+			if expectedVersions[dependency] == "" {
+				expectedVersions[dependency] = version
+				continue
+			}
+			if version != expectedVersions[dependency] {
+				t.Errorf("%s requires %s@%s, want %s", repository.name, dependency, version, expectedVersions[dependency])
+			}
+		}
+	}
+}
+
+type goModManifest struct {
+	Module struct {
+		Path string
+	}
+	Require []struct {
+		Path    string
+		Version string
+	}
+	Replace []json.RawMessage
+}
+
+func readGoMod(t testing.TB, directory string) goModManifest {
+	t.Helper()
+	command := exec.Command("go", "mod", "edit", "-json")
+	command.Dir = directory
+	command.Env = append(os.Environ(), "GOWORK=off")
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("read %s/go.mod: %v", directory, err)
+	}
+	var manifest goModManifest
+	if err := json.Unmarshal(output, &manifest); err != nil {
+		t.Fatalf("decode %s/go.mod: %v", directory, err)
+	}
+	return manifest
+}
 
 func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	rpcRoot, workspaceRoot := workspaceDirectories(t)

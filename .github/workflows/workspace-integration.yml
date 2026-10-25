@@ -1,0 +1,117 @@
+name: Workspace integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/workspace-integration.yml'
+      - 'go.mod'
+      - 'go.sum'
+      - 'grpc/**'
+      - 'jsonrpc/**'
+      - 'internal/**'
+      - 'integration/workspace/**'
+  pull_request:
+    paths:
+      - '.github/workflows/workspace-integration.yml'
+      - 'go.mod'
+      - 'go.sum'
+      - 'grpc/**'
+      - 'jsonrpc/**'
+      - 'internal/**'
+      - 'integration/workspace/**'
+  workflow_dispatch:
+    inputs:
+      fetch_ref:
+        description: fastls-fetch branch, tag or commit
+        required: true
+        default: main
+        type: string
+      mitm_ref:
+        description: fastls-mitm branch, tag or commit
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: workspace-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+  FETCH_REF: ${{ inputs.fetch_ref || 'main' }}
+  MITM_REF: ${{ inputs.mitm_ref || 'main' }}
+
+jobs:
+  four-process-contract:
+    name: Fetch, JSON-RPC and gRPC through MITM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out fastls-rpc
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: workspace/fastls-rpc-ftransport
+          persist-credentials: false
+      - name: Check out fastls-fetch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/fastls-fetch
+          ref: ${{ env.FETCH_REF }}
+          path: workspace/fastls-fetch-ftransport
+          persist-credentials: false
+      - name: Check out fastls-mitm
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/fastls-mitm
+          ref: ${{ env.MITM_REF }}
+          path: workspace/fastls-mitm-ftransport
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.26.10'
+          cache: true
+          cache-dependency-path: |
+            workspace/fastls-fetch-ftransport/go.sum
+            workspace/fastls-rpc-ftransport/go.sum
+            workspace/fastls-mitm-ftransport/go.sum
+      - name: Record exact source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p workspace-evidence
+          {
+            printf 'go=%s\n' "$(go version)"
+            printf 'fastls-fetch=%s\n' "$(git -C workspace/fastls-fetch-ftransport rev-parse HEAD)"
+            printf 'fastls-rpc=%s\n' "$(git -C workspace/fastls-rpc-ftransport rev-parse HEAD)"
+            printf 'fastls-mitm=%s\n' "$(git -C workspace/fastls-mitm-ftransport rev-parse HEAD)"
+          } | tee workspace-evidence/revisions.txt
+          for module in fastls-fetch-ftransport fastls-rpc-ftransport fastls-mitm-ftransport; do
+            (cd "workspace/${module}" && go mod edit -json) \
+              > "workspace-evidence/${module}-go-mod.json"
+          done
+      - name: Verify standalone modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in fastls-fetch-ftransport fastls-rpc-ftransport fastls-mitm-ftransport; do
+            (cd "workspace/${module}" && go mod verify)
+          done
+      - name: Run four-process contract
+        shell: bash
+        working-directory: workspace/fastls-rpc-ftransport
+        run: |
+          set -euo pipefail
+          go test -count=3 -tags workspace_e2e ./integration/workspace 2>&1 \
+            | tee ../../workspace-evidence/workspace-e2e.log
+      - name: Upload workspace evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: workspace-integration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: workspace-evidence/
+          retention-days: 14
+          if-no-files-found: error
