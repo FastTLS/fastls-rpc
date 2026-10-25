@@ -13,13 +13,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
 	"github.com/FastTLS/fastls-rpc/internal/testprocess"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func TestWorkspaceDependencyAlignment(t *testing.T) {
@@ -87,9 +90,9 @@ func readGoMod(t testing.TB, directory string) goModManifest {
 	command := exec.Command("go", "mod", "edit", "-json")
 	command.Dir = directory
 	command.Env = append(os.Environ(), "GOWORK=off")
-	output, err := command.Output()
+	output, err := command.CombinedOutput()
 	if err != nil {
-		t.Fatalf("read %s/go.mod: %v", directory, err)
+		t.Fatalf("read %s/go.mod: %v\n%s", directory, err, output)
 	}
 	var manifest goModManifest
 	if err := json.Unmarshal(output, &manifest); err != nil {
@@ -108,7 +111,9 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	grpcBinary := testprocess.BuildInDir(t, rpcRoot, "./grpc", "fastls-grpc")
 	mitmBinary := testprocess.BuildInDir(t, mitmRoot, ".", "fastls-mitm")
 
+	var targetRequests atomic.Int64
 	target := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetRequests.Add(1)
 		body, _ := io.ReadAll(r.Body)
 		_, _ = io.WriteString(w, r.Proto+"|"+r.Method+"|"+string(body))
 	}))
@@ -139,6 +144,46 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	grpcAddress := testprocess.ReserveLoopbackAddress(t)
 	grpcProcess := testprocess.Start(t, grpcBinary, "-addr", grpcAddress)
 	assertGRPCThroughMITM(t, grpcAddress, target.URL, parentProxy, grpcProcess)
+
+	if got := targetRequests.Load(); got != 3 {
+		t.Fatalf("successful target requests = %d, want 3", got)
+	}
+
+	t.Run("invalid configuration is rejected", func(t *testing.T) {
+		assertFetchRejectsInvalidConfiguration(t, "http://"+fetchAddress+"/fetch", fetchProcess)
+		assertJSONRPCRejectsInvalidConfiguration(t, "http://"+jsonRPCAddress+"/rpc", jsonRPCProcess)
+		assertGRPCRejectsInvalidConfiguration(t, grpcAddress, grpcProcess)
+	})
+
+	t.Run("rejected proxy never falls back to direct", func(t *testing.T) {
+		var proxyRequests atomic.Int64
+		var nonConnectRequests atomic.Int64
+		rejectingProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			proxyRequests.Add(1)
+			if r.Method != http.MethodConnect {
+				nonConnectRequests.Add(1)
+			}
+			http.Error(w, "proxy unavailable", http.StatusBadGateway)
+		}))
+		defer rejectingProxy.Close()
+
+		assertFetchProxyFailure(t, "http://"+fetchAddress+"/fetch", target.URL, rejectingProxy.URL, fetchProcess)
+		assertJSONRPCProxyFailure(t, "http://"+jsonRPCAddress+"/rpc", target.URL, rejectingProxy.URL, jsonRPCProcess)
+		assertGRPCProxyFailure(t, grpcAddress, target.URL, rejectingProxy.URL, grpcProcess)
+		if got := proxyRequests.Load(); got != 3 {
+			t.Fatalf("rejecting proxy requests = %d, want 3", got)
+		}
+		if got := nonConnectRequests.Load(); got != 0 {
+			t.Fatalf("rejecting proxy received %d non-CONNECT requests", got)
+		}
+		if got := targetRequests.Load(); got != 3 {
+			t.Fatalf("target received %d requests after proxy failures; direct fallback occurred", got)
+		}
+	})
+
+	testprocess.WaitForHTTPStatus(t, "http://"+fetchAddress+"/health", http.StatusOK, fetchProcess)
+	testprocess.WaitForHTTPStatus(t, "http://"+jsonRPCAddress+"/health", http.StatusOK, jsonRPCProcess)
+	assertGRPCHealth(t, grpcAddress, grpcProcess)
 }
 
 func workspaceDirectories(t testing.TB) (string, string) {
@@ -220,7 +265,131 @@ func assertGRPCThroughMITM(t testing.TB, address, target, parentProxy string, pr
 	}
 }
 
+func assertFetchRejectsInvalidConfiguration(t testing.TB, endpoint string, process *testprocess.Process) {
+	t.Helper()
+	var response struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	postJSONStatus(t, endpoint, map[string]any{"url": "https://invalid.test", "timeout": -1}, &response, http.StatusBadRequest, process)
+	if response.OK || response.Error == "" {
+		t.Fatalf("fetch invalid configuration response: %+v", response)
+	}
+}
+
+func assertJSONRPCRejectsInvalidConfiguration(t testing.TB, endpoint string, process *testprocess.Process) {
+	t.Helper()
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "fetch",
+		"params":  map[string]any{"url": "https://invalid.test", "timeout": -1},
+		"id":      1,
+	}
+	var response struct {
+		Error *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+			Data    any    `json:"data"`
+		} `json:"error"`
+	}
+	postJSON(t, endpoint, payload, &response, process)
+	if response.Error == nil || response.Error.Code != -32602 {
+		t.Fatalf("JSON-RPC invalid configuration response: %+v", response)
+	}
+}
+
+func assertGRPCRejectsInvalidConfiguration(t testing.TB, address string, process *testprocess.Process) {
+	t.Helper()
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := client.Fetch(ctx, &pb.FetchRequest{Url: "https://invalid.test", Timeout: -1})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("gRPC invalid configuration error = %v, want InvalidArgument\n%s", err, process.Logs())
+	}
+}
+
+func assertFetchProxyFailure(t testing.TB, endpoint, target, parentProxy string, process *testprocess.Process) {
+	t.Helper()
+	var response struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	postJSON(t, endpoint, map[string]any{
+		"url": target, "parent_proxy": parentProxy, "timeout": 1,
+	}, &response, process)
+	if response.OK || response.Error == "" {
+		t.Fatalf("fetch rejected proxy response: %+v", response)
+	}
+}
+
+func assertJSONRPCProxyFailure(t testing.TB, endpoint, target, parentProxy string, process *testprocess.Process) {
+	t.Helper()
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "fetch",
+		"params": map[string]any{
+			"url": target, "parent_proxy": parentProxy, "timeout": 1,
+		},
+		"id": 1,
+	}
+	var response struct {
+		Result struct {
+			OK    bool   `json:"ok"`
+			Error string `json:"error"`
+		} `json:"result"`
+		Error any `json:"error"`
+	}
+	postJSON(t, endpoint, payload, &response, process)
+	if response.Error != nil || response.Result.OK || response.Result.Error == "" {
+		t.Fatalf("JSON-RPC rejected proxy response: %+v", response)
+	}
+}
+
+func assertGRPCProxyFailure(t testing.TB, address, target, parentProxy string, process *testprocess.Process) {
+	t.Helper()
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	response, err := client.Fetch(ctx, &pb.FetchRequest{
+		Url: target, ParentProxy: parentProxy, Timeout: 1,
+	})
+	if err != nil {
+		t.Fatalf("gRPC rejected proxy call failed: %v\n%s", err, process.Logs())
+	}
+	if response.Ok || response.Error == "" {
+		t.Fatalf("gRPC rejected proxy response: %+v", response)
+	}
+}
+
+func assertGRPCHealth(t testing.TB, address string, process *testprocess.Process) {
+	t.Helper()
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	response, err := client.Health(ctx, &pb.HealthRequest{})
+	if err != nil || response.Status != "ok" {
+		t.Fatalf("gRPC health after failures: response=%+v err=%v\n%s", response, err, process.Logs())
+	}
+}
+
+func newGRPCClient(t testing.TB, address string) (*grpc.ClientConn, pb.FastlsServiceClient) {
+	t.Helper()
+	connection, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return connection, pb.NewFastlsServiceClient(connection)
+}
+
 func postJSON(t testing.TB, endpoint string, value, result any, process *testprocess.Process) {
+	postJSONStatus(t, endpoint, value, result, http.StatusOK, process)
+}
+
+func postJSONStatus(t testing.TB, endpoint string, value, result any, expectedStatus int, process *testprocess.Process) {
 	t.Helper()
 	payload, err := json.Marshal(value)
 	if err != nil {
@@ -231,7 +400,7 @@ func postJSON(t testing.TB, endpoint string, value, result any, process *testpro
 		t.Fatalf("POST %s: %v\n%s", endpoint, err, process.Logs())
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != expectedStatus {
 		body, _ := io.ReadAll(response.Body)
 		t.Fatalf("POST %s: status=%d body=%q", endpoint, response.StatusCode, body)
 	}

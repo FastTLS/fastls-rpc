@@ -1,6 +1,6 @@
 # 跨仓四进程联调
 
-这组测试首先确认三个服务使用完全一致的 `fastls`、`ftransport`、`imitate` 和 `profile` 版本，并拒绝 `replace` 指令；随后从当前源码构建并启动 `fastls-fetch`、`fastls-jsonrpc`、`fastls-grpc` 和 `fastls-mitm`，再让三个服务入口通过同一个 MITM 访问本地 HTTPS/HTTP2 目标。它验证的是可发布依赖、外部进程和公开协议契约，不使用进程内处理器替代 CLI。
+这组测试首先确认三个服务使用完全一致的 `fastls`、`ftransport`、`imitate` 和 `profile` 版本，并拒绝 `replace` 指令；随后从当前源码构建并启动 `fastls-fetch`、`fastls-jsonrpc`、`fastls-grpc` 和 `fastls-mitm`，再让三个服务入口通过同一个 MITM 访问本地 HTTPS/HTTP2 目标。负向契约还会验证无效配置的协议级错误、上级代理拒绝 CONNECT 时不会静默直连，以及失败后三个服务仍然健康。它验证的是可发布依赖、外部进程和公开协议契约，不使用进程内处理器替代 CLI。
 
 ## 本地运行
 
