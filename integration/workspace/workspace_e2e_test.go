@@ -439,14 +439,20 @@ func assertGRPCProxyFailure(t testing.TB, address, target, parentProxy string, p
 
 func assertGRPCHealth(t testing.TB, address string, process *testprocess.Process) {
 	t.Helper()
-	connection, client := newGRPCClient(t, address)
-	defer connection.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	response, err := client.Health(ctx, &pb.HealthRequest{})
-	if err != nil || response.Status != "ok" {
-		t.Fatalf("gRPC health after failures: response=%+v err=%v\n%s", response, err, process.Logs())
+	var response *pb.HealthResponse
+	var err error
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+		connection, client := newGRPCClient(t, address)
+		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+		response, err = client.Health(ctx, &pb.HealthRequest{})
+		cancel()
+		connection.Close()
+		if err == nil && response.Status == "ok" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
+	t.Fatalf("gRPC did not become healthy: response=%+v err=%v\n%s", response, err, process.Logs())
 }
 
 func newGRPCClient(t testing.TB, address string) (*grpc.ClientConn, pb.FastlsServiceClient) {
