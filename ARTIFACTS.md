@@ -1,8 +1,8 @@
-# 开发产物与来源证明
+# 发布产物与来源证明
 
 ## 范围与内容
 
-`Development artifacts` 工作流只提供临时开发构建。它在 `main` 更新或手动触发时运行，不创建 tag、GitHub Release 或正式版本；Actions 产物保留 14 天。
+`Development artifacts` 工作流在 `main` 更新或手动触发时提供保留 14 天的开发构建；推送 `v*` 标签时，它会在验证成功后创建正式 GitHub Release。不会发布到 GitHub 之外的渠道。
 
 每个 Linux、Windows、macOS 的 amd64/arm64 归档都包含：
 
@@ -10,11 +10,11 @@
 - `fastls-grpc`（Windows 为 `.exe`）
 - `BUILD_INFO.txt`
 
-归档名包含 `dev-<commit前12位>`。
+开发归档名包含 `dev-<commit前12位>`，正式归档名包含版本标签。
 
 ## 下载
 
-从 Actions 页面下载 `fastls-rpc-development-<完整提交SHA>`，或使用：
+正式版本从 GitHub Releases 页面下载。开发版本从 Actions 页面下载 `fastls-rpc-development-<完整提交SHA>`，或使用：
 
 ```bash
 gh run list --repo FastTLS/fastls-rpc --workflow development-artifacts.yml
@@ -56,7 +56,7 @@ gh attestation verify fastls-rpc-dev-COMMIT-linux-amd64.tar.gz \
 
 完全离线验证还需在联网环境准备 `gh attestation trusted-root > trusted_root.jsonl`，离线命令额外传入 `--custom-trusted-root trusted_root.jsonl`。
 
-验证成功表示归档摘要和签发工作流身份匹配，不表示该构建是正式版本。
+验证成功表示归档摘要和签发工作流身份匹配；只有位于正式 GitHub Release 且标签匹配的产物才是正式版本。
 
 ## 签发链路
 

@@ -69,7 +69,7 @@ python -m grpc_tools.protoc -I grpc/proto \
 
 ## 开发产物
 
-合入 `main` 或手动运行 `Development artifacts` 后，工作流会再次验证源码，再构建、计算校验和、签发来源证明并自验证。它不创建标签或 Release。详见 [ARTIFACTS.md](./ARTIFACTS.md)。
+合入 `main` 或手动运行 `Development artifacts` 后，工作流生成临时开发产物。推送受审的 `v*` 标签时，同一流程在所有验证成功后创建正式 GitHub Release，且不向其他渠道发布。详见 [ARTIFACTS.md](./ARTIFACTS.md)。
 
 ## 文档同步
 
