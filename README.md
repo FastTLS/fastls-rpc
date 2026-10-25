@@ -66,6 +66,8 @@ gRPC 的权威接口定义位于 [`grpc/proto/fastls.proto`](./grpc/proto/fastls
 
 JSON-RPC 与 gRPC 共用同一请求执行层和字段优先级：`parent_proxy` > `proxy`，显式 HTTP/2 设置覆盖浏览器预设，调用取消会传递到下游连接。两种协议对无效指纹及 HTTP/2 设置分别返回 `-32602` 与 `INVALID_ARGUMENT`，避免同一请求在两个入口出现不同结果。
 
+两个服务收到 Ctrl+C、SIGINT 或 SIGTERM 后停止接受新连接，并给活动 HTTP 请求或 RPC 最多 5 秒完成；超过窗口后会强制停止。
+
 ```text
 fastls-rpc
   ├─ jsonrpc / grpc

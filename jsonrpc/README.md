@@ -2,6 +2,8 @@
 
 基于 JSON-RPC 2.0 协议的 RPC 服务器，提供 HTTP 请求功能，支持 TLS 指纹伪装。
 
+服务收到 Ctrl+C、SIGINT 或 SIGTERM 后停止接受新连接，并给活动 HTTP 请求最多 5 秒完成；超过窗口后强制关闭。
+
 ## 目录结构
 
 ```

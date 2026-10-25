@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
 
 	fastls "github.com/FastTLS/fastls"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
+	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"github.com/gin-gonic/gin"
 )
 
@@ -220,25 +225,34 @@ func main() {
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	r := newJSONRPCRouter(rpcServer)
+
+	// 启动服务器
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("监听端口失败: %v", err)
+	}
+	shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	server := &http.Server{Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	log.Printf("RPC服务启动在端口 %s", listener.Addr())
+	log.Printf("RPC端点: http://%s/rpc", listener.Addr())
+	if err := serverlifecycle.ServeHTTP(shutdownContext, listener, server); err != nil {
+		log.Fatalf("服务器启动失败: %v", err)
+	}
+	if shutdownContext.Err() != nil {
+		log.Printf("RPC服务已安全停止")
+	}
+}
+
+func newJSONRPCRouter(rpcServer *RPCServer) *gin.Engine {
 	r := gin.Default()
-
-	// 添加CORS中间件
 	r.Use(rpcCorsMiddleware())
-
-	// 健康检查端点
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-
-	// RPC端点
 	r.POST("/rpc", rpcServer.handleRPC)
-
-	// 启动服务器
-	log.Printf("RPC服务启动在端口 %s", addr)
-	log.Printf("RPC端点: http://localhost%s/rpc", addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("服务器启动失败: %v", err)
-	}
+	return r
 }
 
 // rpcCorsMiddleware CORS中间件

@@ -6,12 +6,15 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
 	fastls "github.com/FastTLS/fastls"
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
+	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -144,10 +147,15 @@ func main() {
 	}
 
 	log.Printf("gRPC服务启动在端口 %s", addr)
-	log.Printf("gRPC端点: localhost%s", addr)
+	log.Printf("gRPC端点: %s", lis.Addr())
 
 	// 启动服务器
-	if err := s.Serve(lis); err != nil {
+	shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	if err := serverlifecycle.ServeGRPC(shutdownContext, lis, s); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
+	}
+	if shutdownContext.Err() != nil {
+		log.Printf("gRPC服务已安全停止")
 	}
 }
