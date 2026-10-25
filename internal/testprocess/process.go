@@ -1,6 +1,7 @@
 package testprocess
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ type Process struct {
 	logPath string
 	logFile *os.File
 	stop    sync.Once
+	done    chan struct{}
+	waitErr error
 }
 
 func Build(t testing.TB, packagePath, name string) string {
@@ -65,7 +68,11 @@ func Start(t testing.TB, binary string, arguments ...string) *Process {
 		logFile.Close()
 		t.Fatal(err)
 	}
-	process := &Process{command: command, logPath: logPath, logFile: logFile}
+	process := &Process{command: command, logPath: logPath, logFile: logFile, done: make(chan struct{})}
+	go func() {
+		process.waitErr = command.Wait()
+		close(process.done)
+	}()
 	t.Cleanup(process.Close)
 	return process
 }
@@ -73,11 +80,35 @@ func Start(t testing.TB, binary string, arguments ...string) *Process {
 func (p *Process) Close() {
 	p.stop.Do(func() {
 		if p.command.Process != nil {
-			_ = p.command.Process.Kill()
-			_, _ = p.command.Process.Wait()
+			select {
+			case <-p.done:
+			default:
+				_ = p.command.Process.Kill()
+				<-p.done
+			}
 		}
 		_ = p.logFile.Close()
 	})
+}
+
+func (p *Process) Signal(signal os.Signal) error {
+	select {
+	case <-p.done:
+		return os.ErrProcessDone
+	default:
+		return p.command.Process.Signal(signal)
+	}
+}
+
+func (p *Process) Wait(timeout time.Duration) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-p.done:
+		return p.waitErr
+	case <-timer.C:
+		return fmt.Errorf("process did not exit within %s", timeout)
+	}
 }
 
 func (p *Process) Logs() string {

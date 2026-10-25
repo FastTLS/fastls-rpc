@@ -1,6 +1,6 @@
 # 跨仓四进程联调
 
-这组测试首先确认三个服务使用完全一致的 `fastls`、`ftransport`、`imitate` 和 `profile` 版本，并拒绝 `replace` 指令；随后从当前源码构建并启动 `fastls-fetch`、`fastls-jsonrpc`、`fastls-grpc` 和 `fastls-mitm`，再让三个服务入口通过同一个 MITM 访问本地 HTTPS/HTTP2 目标。负向契约还会验证无效配置的协议级错误、三种入口的 4 MiB 请求边界、上级代理拒绝 CONNECT 时不会静默直连，以及失败后三个服务仍然健康。它验证的是可发布依赖、外部进程和公开协议契约，不使用进程内处理器替代 CLI。
+这组测试首先确认三个服务使用完全一致的 `fastls`、`ftransport`、`imitate` 和 `profile` 版本，并拒绝 `replace` 指令；随后从当前源码构建并启动 `fastls-fetch`、`fastls-jsonrpc`、`fastls-grpc` 和 `fastls-mitm`，再让三个服务入口通过同一个 MITM 访问本地 HTTPS/HTTP2 目标。负向契约还会验证无效配置的协议级错误、三种入口的 4 MiB 请求边界、上级代理拒绝 CONNECT 时不会静默直连、服务超时和 gRPC 调用取消向目标传播，以及失败后三个服务仍然健康。Linux/macOS 还会向四个真实进程发送中断信号，确认它们在时限内退出并关闭监听端口。它验证的是可发布依赖、外部进程和公开协议契约，不使用进程内处理器替代 CLI。
 
 ## 本地运行
 
@@ -19,6 +19,8 @@ GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace
 ```
 
 测试只监听环回地址，目标、CA、二进制和进程日志都位于测试临时目录，不访问公网。
+
+Windows 本地运行会跳过 POSIX 中断信号用例；协调 Action 的 Ubuntu runner 会执行该用例。Windows 上的生命周期实现仍由各仓库的 context 取消和监听器关闭测试覆盖，不把不等价的强制终止冒充优雅退出。
 
 ## GitHub Actions
 

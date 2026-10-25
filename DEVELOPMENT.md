@@ -36,7 +36,7 @@ JSON-RPC HTTP 入口变更必须覆盖 CORS 凭据语义和 4 MiB 请求体边�
 
 `jsonrpc/binary_e2e_test.go` 与 `grpc/binary_e2e_test.go` 会分别构建并启动当前 CLI，通过真实 TCP 端口验证健康检查和 fetch 契约。进程管理统一使用 `internal/testprocess`。
 
-当同级目录存在 `fastls-fetch-ftransport` 与 `fastls-mitm-ftransport` 时，可运行 `GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace`。该测试先校验三仓共享依赖版本一致且没有 `replace`，再构建四个真实服务进程，并验证 Fetch、JSON-RPC、gRPC 都能经 MITM 访问同一个环回 HTTPS 目标；负向用例验证无效配置、4 MiB 请求边界、上级代理拒绝 CONNECT 时禁止静默直连，以及失败后的服务健康状态。普通单仓测试矩阵不启用此标签。组合测试使用 HTTPS，因为 `ftransport` 的上游代理路径使用 CONNECT，而 MITM 按 TLS 隧道处理 CONNECT 目标。
+当同级目录存在 `fastls-fetch-ftransport` 与 `fastls-mitm-ftransport` 时，可运行 `GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace`。该测试先校验三仓共享依赖版本一致且没有 `replace`，再构建四个真实服务进程，并验证 Fetch、JSON-RPC、gRPC 都能经 MITM 访问同一个环回 HTTPS 目标；负向用例验证无效配置、4 MiB 请求边界、上级代理拒绝 CONNECT 时禁止静默直连、服务超时和 gRPC 调用取消向目标传播，以及失败后的服务健康状态。Linux/macOS 还会验证四个 CLI 收到中断信号后在时限内退出并关闭监听端口；Windows 不使用强制终止冒充信号优雅退出。普通单仓测试矩阵不启用此标签。组合测试使用 HTTPS，因为 `ftransport` 的上游代理路径使用 CONNECT，而 MITM 按 TLS 隧道处理 CONNECT 目标。
 
 `.github/workflows/workspace-integration.yml` 是跨仓协调门禁：RPC 拉取请求和主分支运行使用另外两个仓库的 `main`，手动运行可以固定 Fetch、MITM 的分支、标签或提交，RPC ref 由工作流启动位置决定。结果 artifact 必须包含三仓精确提交号、模块依赖清单和联调日志；候选验证不得省略 ref 记录。完整说明见 `integration/workspace/README.md`。
 

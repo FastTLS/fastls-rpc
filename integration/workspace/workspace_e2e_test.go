@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -187,6 +188,23 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 		if got := targetRequests.Load(); got != 3 {
 			t.Fatalf("target received %d requests after proxy failures; direct fallback occurred", got)
 		}
+	})
+
+	t.Run("service timeout reaches target", func(t *testing.T) {
+		assertHTTPServiceTimeout(t, "http://"+fetchAddress+"/fetch", func(target string) any {
+			return map[string]any{"url": target, "method": http.MethodPost, "body": "timeout-fetch", "timeout": 1}
+		}, fetchProcess)
+		assertHTTPServiceTimeout(t, "http://"+jsonRPCAddress+"/rpc", func(target string) any {
+			return map[string]any{
+				"jsonrpc": "2.0", "method": "fetch", "id": 1,
+				"params": map[string]any{"url": target, "method": http.MethodPost, "body": "timeout-jsonrpc", "timeout": 1},
+			}
+		}, jsonRPCProcess)
+		assertGRPCServiceTimeout(t, grpcAddress, grpcProcess)
+	})
+
+	t.Run("gRPC caller cancellation reaches target", func(t *testing.T) {
+		assertGRPCServiceCancellation(t, grpcAddress, grpcProcess)
 	})
 
 	testprocess.WaitForHTTPStatus(t, "http://"+fetchAddress+"/health", http.StatusOK, fetchProcess)
@@ -438,6 +456,143 @@ func newGRPCClient(t testing.TB, address string) (*grpc.ClientConn, pb.FastlsSer
 		t.Fatal(err)
 	}
 	return connection, pb.NewFastlsServiceClient(connection)
+}
+
+func assertHTTPServiceTimeout(t testing.TB, endpoint string, requestValue func(string) any, process *testprocess.Process) {
+	t.Helper()
+	target, started, targetDone := newCancellationTarget(t)
+	payload, err := json.Marshal(requestValue(target.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	type requestResult struct {
+		status int
+		body   []byte
+		err    error
+	}
+	requestDone := make(chan requestResult, 1)
+	go func() {
+		response, requestErr := http.Post(endpoint, "application/json", bytes.NewReader(payload))
+		if requestErr != nil {
+			requestDone <- requestResult{err: requestErr}
+			return
+		}
+		defer response.Body.Close()
+		body, readErr := io.ReadAll(response.Body)
+		requestDone <- requestResult{status: response.StatusCode, body: body, err: readErr}
+	}()
+
+	waitForSignal(t, started, "target request did not start")
+	select {
+	case result := <-requestDone:
+		if result.err != nil || result.status != http.StatusOK || !bytes.Contains(result.body, []byte(`"ok":false`)) {
+			t.Fatalf("service timeout response: status=%d body=%q err=%v\n%s", result.status, result.body, result.err, process.Logs())
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("service request did not return after timeout\n%s", process.Logs())
+	}
+	if err := waitForTargetCancellation(targetDone); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertGRPCServiceTimeout(t testing.TB, address string, process *testprocess.Process) {
+	t.Helper()
+	target, started, targetDone := newCancellationTarget(t)
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	requestDone := make(chan struct {
+		response *pb.FetchResponse
+		err      error
+	}, 1)
+	go func() {
+		response, err := client.Fetch(context.Background(), &pb.FetchRequest{
+			Url: target.URL, Method: http.MethodPost, Body: "timeout-grpc", Timeout: 1,
+		})
+		requestDone <- struct {
+			response *pb.FetchResponse
+			err      error
+		}{response: response, err: err}
+	}()
+
+	waitForSignal(t, started, "gRPC timeout target request did not start")
+	select {
+	case result := <-requestDone:
+		if result.err != nil || result.response == nil || result.response.Ok || result.response.Error == "" {
+			t.Fatalf("gRPC timeout response=%+v err=%v\n%s", result.response, result.err, process.Logs())
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("gRPC request did not return after timeout\n%s", process.Logs())
+	}
+	if err := waitForTargetCancellation(targetDone); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertGRPCServiceCancellation(t testing.TB, address string, process *testprocess.Process) {
+	t.Helper()
+	target, started, targetDone := newCancellationTarget(t)
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	requestDone := make(chan error, 1)
+	go func() {
+		_, err := client.Fetch(ctx, &pb.FetchRequest{
+			Url: target.URL, Method: http.MethodPost, Body: "cancel-grpc",
+		})
+		requestDone <- err
+	}()
+
+	waitForSignal(t, started, "gRPC target request did not start")
+	cancel()
+	select {
+	case err := <-requestDone:
+		if status.Code(err) != codes.Canceled {
+			t.Fatalf("gRPC cancellation error = %v, want Canceled\n%s", err, process.Logs())
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("gRPC request did not return after cancellation\n%s", process.Logs())
+	}
+	if err := waitForTargetCancellation(targetDone); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newCancellationTarget(t testing.TB) (*httptest.Server, <-chan struct{}, <-chan error) {
+	t.Helper()
+	started := make(chan struct{})
+	done := make(chan error, 1)
+	target := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		_, _ = io.Copy(io.Discard, request.Body)
+		_ = request.Body.Close()
+		close(started)
+		select {
+		case <-request.Context().Done():
+			done <- nil
+		case <-time.After(5 * time.Second):
+			done <- errors.New("target request context was not canceled")
+		}
+	}))
+	t.Cleanup(target.Close)
+	return target, started, done
+}
+
+func waitForSignal(t testing.TB, signal <-chan struct{}, message string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(3 * time.Second):
+		t.Fatal(message)
+	}
+}
+
+func waitForTargetCancellation(done <-chan error) error {
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(4 * time.Second):
+		return errors.New("timed out waiting for target cancellation")
+	}
 }
 
 func postJSON(t testing.TB, endpoint string, value, result any, process *testprocess.Process) {
