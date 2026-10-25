@@ -34,6 +34,10 @@ go build -o build/fastls-grpc ./grpc
 
 JSON-RPC HTTP 入口变更必须覆盖 CORS 凭据语义和 4 MiB 请求体边界；超限响应同时验证 HTTP `413` 与 JSON-RPC `-32600`。
 
+`jsonrpc/binary_e2e_test.go` 与 `grpc/binary_e2e_test.go` 会分别构建并启动当前 CLI，通过真实 TCP 端口验证健康检查和 fetch 契约。进程管理统一使用 `internal/testprocess`。
+
+当同级目录存在 `fastls-fetch-ftransport` 与 `fastls-mitm-ftransport` 时，可运行 `go test -tags workspace_e2e ./integration/workspace`。该测试构建四个真实服务进程，并验证 Fetch、JSON-RPC、gRPC 都能经 MITM 访问同一个环回 HTTPS 目标；普通独立仓库 CI 不启用此标签。组合测试使用 HTTPS，因为 `ftransport` 的上游代理路径使用 CONNECT，而 MITM 按 TLS 隧道处理 CONNECT 目标。
+
 ## Protobuf 变更
 
 `grpc/proto/fastls.proto` 是接口源。当前 Go 生成基线为 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0；Python 生成基线为 `grpcio-tools` 1.76.0（Protobuf Python 6.31.1）。只有 `.proto` 变化或修复生成文件时才重新生成：

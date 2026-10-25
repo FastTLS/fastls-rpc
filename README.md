@@ -93,6 +93,8 @@ GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依
 
 本地集成测试共用环回目标与 CONNECT 代理夹具，覆盖请求体/请求头/Cookie、压缩响应、禁用重定向、代理优先级、取消传播、JSON-RPC 的 CORS/请求大小边界，以及两个 RPC 适配层的字段映射；不访问公网。
 
+默认测试还会分别构建并启动 JSON-RPC 与 gRPC CLI，通过真实 TCP 端口验证健康检查和 fetch。若同级目录存在三个迁移工作区，可运行 `go test -tags workspace_e2e ./integration/workspace`，构建 Fetch、JSON-RPC、gRPC、MITM 四个进程并验证三种入口经 MITM 访问同一个环回 HTTPS 目标。
+
 ## 文档索引
 
 - [JSON-RPC 概览](./jsonrpc/README.md) / [完整 API](./jsonrpc/RPC_SERVER.md) / [客户端示例](./jsonrpc/example/README.md)
