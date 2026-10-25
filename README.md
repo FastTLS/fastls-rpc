@@ -1,70 +1,99 @@
-# Fastls RPC 服务
+# fastls-rpc
 
-提供两种RPC实现方式，都支持HTTP请求功能和TLS指纹伪装。
+FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
-## 服务类型
+> 当前状态：开发阶段。仓库只生成带来源证明、保留 14 天的开发构建，不创建版本标签、GitHub Release 或正式发布包。
 
-### JSON-RPC 2.0 服务
+## 服务入口
 
-- **位置**: [jsonrpc/](./jsonrpc/)
-- **端口**: 8801
-- **协议**: HTTP + JSON
-- **特点**: 简单易用，基于HTTP协议
-- **文档**: [JSON-RPC服务文档](./jsonrpc/README.md)
+| 服务 | 二进制 | 默认地址 | 接口 |
+| --- | --- | --- | --- |
+| JSON-RPC 2.0 | `fastls-jsonrpc` | `127.0.0.1:8801` | `POST /rpc`、`GET /health` |
+| gRPC | `fastls-grpc` | `127.0.0.1:8802` | `FastlsService.Health`、`FastlsService.Fetch` |
 
-### gRPC 服务
+JSON-RPC 适合无需生成客户端的 HTTP 集成；gRPC 适合需要 Protobuf 类型约束和标准 gRPC 工具链的场景。
 
-- **位置**: [grpc/](./grpc/)
-- **端口**: 8802
-- **协议**: HTTP/2 + Protobuf
-- **特点**: 高性能，类型安全
-- **文档**: [gRPC服务文档](./grpc/README.md)
+## 环境要求
 
-## 快速对比
+- Go 1.26 或更高版本；CI 同时覆盖 Go 1.26.10 和 1.27.3
+- 使用仓库自己的 `go.mod`，建议设置 `GOWORK=off`
+- 只有修改 `.proto` 时才需要 `protoc` 及 Go 插件；仓库已提交生成代码
 
-| 特性 | JSON-RPC 2.0 | gRPC |
-|------|--------------|------|
-| 协议 | HTTP + JSON | HTTP/2 + Protobuf |
-| 性能 | 中等 | 高 |
-| 类型安全 | 弱 | 强 |
-| 流式传输 | 不支持 | 支持 |
-| 复杂度 | 低 | 中等 |
-| 端口 | 8801 | 8802 |
-| 适用场景 | 简单RPC调用 | 高性能、类型安全要求高的场景 |
+## 从源码构建
 
-## 选择建议
-
-### 使用 JSON-RPC 2.0 如果：
-- 需要简单的RPC调用
-- 希望使用HTTP协议，易于调试
-- 不需要高性能要求
-- 希望快速集成
-
-### 使用 gRPC 如果：
-- 需要高性能
-- 需要类型安全
-- 需要流式传输
-- 需要跨语言支持
-
-## 目录结构
-
-```
-rpc/
-├── README.md              # 本文件
-├── jsonrpc/               # JSON-RPC 2.0服务
-│   ├── rpc_server.go
-│   ├── RPC_SERVER.md
-│   ├── README.md
-│   └── example/
-└── grpc/                  # gRPC服务
-    ├── grpc_server.go
-    ├── GRPC_SERVER.md
-    ├── README.md
-    ├── proto/
-    └── grpc_example/
+```bash
+git clone https://github.com/FastTLS/fastls-rpc.git
+cd fastls-rpc
+go mod download
+go build -o fastls-jsonrpc ./jsonrpc
+go build -o fastls-grpc ./grpc
 ```
 
-## 相关服务
+Windows 为输出文件添加 `.exe`。
 
-- [Fetch服务](../fetch/) - HTTP请求服务
-- [MITM代理服务](../mitm/) - 中间人代理服务
+## 运行
+
+```bash
+./fastls-jsonrpc -addr 127.0.0.1:8801
+./fastls-grpc -addr 127.0.0.1:8802
+
+./fastls-jsonrpc -help
+./fastls-grpc -version
+```
+
+JSON-RPC 快速请求：
+
+```bash
+curl -X POST http://127.0.0.1:8801/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "fetch",
+    "params": {
+      "url": "https://example.com/",
+      "method": "GET",
+      "browser": "chrome"
+    },
+    "id": 1
+  }'
+```
+
+gRPC 的权威接口定义位于 [`grpc/proto/fastls.proto`](./grpc/proto/fastls.proto)。
+
+## 指纹和传输
+
+建议优先使用稳定别名 `chrome`、`edge`、`firefox`、`safari`、`opera` 或 `chromium`；需要固定实验条件时可以使用版本化选择器。显式 JA3/JA4R 高于 `browser`，未设置时使用默认浏览器配置。无效选择器会返回可诊断错误。
+
+```text
+fastls-rpc
+  ├─ jsonrpc / grpc
+  └─ fastls
+      ├─ ftransport       HTTP/1.1、HTTP/2、HTTP/3 传输
+      ├─ fastls/profile   指纹模型
+      └─ imitate          浏览器预设
+```
+
+CI 会拒绝本地 `replace` 指令和任何重新引入 `github.com/FastTLS/fhttp` 的依赖图。
+
+## 测试与开发构建
+
+```bash
+go mod verify
+go test ./...
+go test -race ./...
+go vet ./...
+go build ./...
+```
+
+GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依赖策略、单元/集成测试、竞态检测、覆盖率、静态检查、两种服务构建和 CLI 冒烟测试。`main` 分支会生成同时包含两个二进制的六个平台开发包、SHA-256 校验和与 Sigstore/GitHub 来源证明，并在上传前完成验证。
+
+## 文档索引
+
+- [JSON-RPC 概览](./jsonrpc/README.md) / [完整 API](./jsonrpc/RPC_SERVER.md) / [客户端示例](./jsonrpc/example/README.md)
+- [gRPC 概览](./grpc/README.md) / [完整 API](./grpc/GRPC_SERVER.md) / [客户端示例](./grpc/grpc_example/README.md)
+- [开发与贡献](./DEVELOPMENT.md)
+- [开发产物及签发验证](./ARTIFACTS.md)
+
+## 安全边界
+
+两个服务都允许调用方指定目标地址和代理。不要把未加访问控制的实例暴露到不受信任网络；部署方应加入认证、请求限制、出口策略和审计。开发构建不承诺稳定 API 或生产支持。

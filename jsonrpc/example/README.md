@@ -5,8 +5,8 @@
 ## 启动RPC服务器
 
 ```bash
-cd services/fastls-rpc
-go run rpc_server.go
+cd fastls-rpc
+go run ./jsonrpc
 ```
 
 服务器默认运行在 `http://localhost:8801/rpc`
@@ -162,14 +162,9 @@ client.fetch({
 
 ## 支持的浏览器类型
 
-- `chrome` - Chrome浏览器
-- `chrome120` - Chrome 120版本
-- `chrome142` - Chrome 142版本
-- `chromium` - Chromium浏览器
-- `edge` - Microsoft Edge浏览器
-- `firefox` - Firefox浏览器
-- `safari` - Safari浏览器
-- `opera` - Opera浏览器
+- 滚动别名：`chrome`、`edge`、`firefox`、`chromium`、`safari`、`opera`
+- 版本选择器：`chrome150`…`chrome160`、`edge150`…`edge160`、`firefox151`…`firefox158`
+- 兼容保留：`chrome120`、`chrome142`、`firefox144`、`firefox147`、`firefox148`
 
 ## 指纹类型
 

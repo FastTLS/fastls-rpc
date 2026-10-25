@@ -7,7 +7,7 @@ require (
 	github.com/FastTLS/imitate v0.0.0-20261025022023-442a9557c0ef
 	github.com/gin-gonic/gin v1.11.0
 	google.golang.org/grpc v1.70.0
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.12
 )
 
 require (

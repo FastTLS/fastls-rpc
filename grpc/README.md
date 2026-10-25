@@ -24,33 +24,29 @@ grpc/
 
 ### 安装依赖
 
-```bash
-go get google.golang.org/grpc
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-```
+普通构建只需在仓库根目录执行 `go mod download`。只有修改 `.proto` 时才需要 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0。
 
 ### 生成代码
 
 首先需要安装protoc工具（参考 https://grpc.io/docs/protoc-installation/）
 
 ```bash
-cd services/fastls-rpc/grpc
+cd fastls-rpc
 protoc --go_out=. --go_opt=paths=source_relative \
        --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       proto/fastls.proto
+       grpc/proto/fastls.proto
 ```
 
 ### 编译
 
 ```bash
-go build -o grpc_server.exe grpc_server.go
+go build -o fastls-grpc.exe ./grpc
 ```
 
 ### 运行
 
 ```bash
-./grpc_server.exe
+./fastls-grpc.exe
 ```
 
 服务器默认运行在 `localhost:8802`
@@ -79,13 +75,8 @@ go build -o grpc_server.exe grpc_server.go
 ### 启动服务器
 
 ```bash
-cd services/fastls-rpc/grpc
-# 先生成protobuf代码
-protoc --go_out=. --go_opt=paths=source_relative \
-       --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       proto/fastls.proto
-# 运行服务器
-go run grpc_server.go
+cd fastls-rpc
+go run ./grpc
 ```
 
 ### 运行客户端示例
@@ -125,6 +116,6 @@ node nodejs_client.js
 ## 相关服务
 
 - [JSON-RPC服务](../jsonrpc/) - 基于HTTP + JSON的RPC服务
-- [Fetch服务](../../fetch/) - HTTP请求服务
-- [MITM代理服务](../../mitm/) - 中间人代理服务
+- [Fetch服务](https://github.com/FastTLS/fastls-fetch) - HTTP请求服务
+- [MITM代理服务](https://github.com/FastTLS/fastls-mitm) - 中间人代理服务
 

@@ -21,14 +21,14 @@ jsonrpc/
 ### 编译
 
 ```bash
-cd services/fastls-rpc/jsonrpc
-go build -o rpc_server.exe rpc_server.go
+cd fastls-rpc
+go build -o fastls-jsonrpc.exe ./jsonrpc
 ```
 
 ### 运行
 
 ```bash
-./rpc_server.exe
+./fastls-jsonrpc.exe
 ```
 
 服务器默认运行在 `http://localhost:8801/rpc`
@@ -56,8 +56,8 @@ go build -o rpc_server.exe rpc_server.go
 ### 启动服务器
 
 ```bash
-cd services/fastls-rpc/jsonrpc
-go run rpc_server.go
+cd fastls-rpc
+go run ./jsonrpc
 ```
 
 ### 运行客户端示例
@@ -84,6 +84,6 @@ node nodejs_client.js
 ## 相关服务
 
 - [gRPC服务](../grpc/) - 基于HTTP/2 + Protobuf的RPC服务
-- [Fetch服务](../../fetch/) - HTTP请求服务
-- [MITM代理服务](../../mitm/) - 中间人代理服务
+- [Fetch服务](https://github.com/FastTLS/fastls-fetch) - HTTP请求服务
+- [MITM代理服务](https://github.com/FastTLS/fastls-mitm) - 中间人代理服务
 
