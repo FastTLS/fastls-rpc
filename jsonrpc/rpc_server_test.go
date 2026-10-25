@@ -80,3 +80,25 @@ func TestJSONRPCFetchParentProxyPrecedence(t *testing.T) {
 		t.Fatalf("unexpected result: %+v", fetchResult)
 	}
 }
+
+func TestJSONRPCFetchMetadataAndTrailers(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		w.Header().Set("Trailer", "X-Response-Trailer")
+		_, _ = io.WriteString(w, r.Trailer.Get("X-Request-Trailer"))
+		w.Header().Set("X-Response-Trailer", "response-value")
+	}))
+	defer target.Close()
+	params, err := json.Marshal(FetchParams{URL: target.URL, Method: http.MethodPost, Body: "payload", Trailers: http.Header{"X-Request-Trailer": {"request-value"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, rpcErr := NewRPCServer().handleFetch(context.Background(), params)
+	if rpcErr != nil {
+		t.Fatal(rpcErr)
+	}
+	got := result.(FetchResult)
+	if !got.OK || got.Body != "request-value" || got.Protocol != "HTTP/1.1" || got.FinalURL != target.URL || got.Trailers.Get("X-Response-Trailer") != "response-value" {
+		t.Fatalf("unexpected result: %+v", got)
+	}
+}

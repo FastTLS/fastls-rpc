@@ -37,6 +37,11 @@ message FetchRequest {
   repeated Cookie cookies = 11;       // Cookie列表
   string http2_settings_string = 12; // HTTP/2设置字符串
   string parent_proxy = 13;          // 上级代理地址（通过参数传递）
+  map<string, HeaderValues> trailers = 14; // 请求Trailer
+}
+
+message HeaderValues {
+  repeated string values = 1;
 }
 
 // 指纹配置
@@ -63,5 +68,8 @@ message FetchResponse {
   map<string, string> headers = 3;   // 响应头
   string body = 4;                    // 响应体
   string error = 5;                   // 错误信息（如果有）
+  string protocol = 6;                // 最终HTTP协议
+  string final_url = 7;               // 跳转后的最终URL
+  map<string, HeaderValues> trailers = 8; // 响应Trailer
 }
 

@@ -105,20 +105,21 @@ func (x *HealthResponse) GetStatus() string {
 
 // HTTP请求
 type FetchRequest struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Url                 string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                                                                                   // 请求URL（必填）
-	Method              string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`                                                                             // HTTP方法，默认GET
-	Headers             map[string]string      `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 请求头
-	Body                string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                 // 请求体
-	Proxy               string                 `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`                                                                               // 代理地址
-	Timeout             int32                  `protobuf:"varint,6,opt,name=timeout,proto3" json:"timeout,omitempty"`                                                                          // 超时时间（秒），默认30
-	DisableRedirect     bool                   `protobuf:"varint,7,opt,name=disable_redirect,json=disableRedirect,proto3" json:"disable_redirect,omitempty"`                                   // 是否禁用重定向
-	UserAgent           string                 `protobuf:"bytes,8,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                      // User-Agent
-	Fingerprint         *Fingerprint           `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`                                                                   // 指纹配置
-	Browser             string                 `protobuf:"bytes,10,opt,name=browser,proto3" json:"browser,omitempty"`                                                                          // 浏览器类型
-	Cookies             []*Cookie              `protobuf:"bytes,11,rep,name=cookies,proto3" json:"cookies,omitempty"`                                                                          // Cookie列表
-	Http2SettingsString string                 `protobuf:"bytes,12,opt,name=http2_settings_string,json=http2SettingsString,proto3" json:"http2_settings_string,omitempty"`                     // HTTP/2设置字符串
-	ParentProxy         string                 `protobuf:"bytes,13,opt,name=parent_proxy,json=parentProxy,proto3" json:"parent_proxy,omitempty"`                                               // 上级代理地址（通过参数传递）
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	Url                 string                   `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                                                                                      // 请求URL（必填）
+	Method              string                   `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`                                                                                // HTTP方法，默认GET
+	Headers             map[string]string        `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`    // 请求头
+	Body                string                   `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                    // 请求体
+	Proxy               string                   `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`                                                                                  // 代理地址
+	Timeout             int32                    `protobuf:"varint,6,opt,name=timeout,proto3" json:"timeout,omitempty"`                                                                             // 超时时间（秒），默认30
+	DisableRedirect     bool                     `protobuf:"varint,7,opt,name=disable_redirect,json=disableRedirect,proto3" json:"disable_redirect,omitempty"`                                      // 是否禁用重定向
+	UserAgent           string                   `protobuf:"bytes,8,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                         // User-Agent
+	Fingerprint         *Fingerprint             `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`                                                                      // 指纹配置
+	Browser             string                   `protobuf:"bytes,10,opt,name=browser,proto3" json:"browser,omitempty"`                                                                             // 浏览器类型
+	Cookies             []*Cookie                `protobuf:"bytes,11,rep,name=cookies,proto3" json:"cookies,omitempty"`                                                                             // Cookie列表
+	Http2SettingsString string                   `protobuf:"bytes,12,opt,name=http2_settings_string,json=http2SettingsString,proto3" json:"http2_settings_string,omitempty"`                        // HTTP/2设置字符串
+	ParentProxy         string                   `protobuf:"bytes,13,opt,name=parent_proxy,json=parentProxy,proto3" json:"parent_proxy,omitempty"`                                                  // 上级代理地址（通过参数传递）
+	Trailers            map[string]*HeaderValues `protobuf:"bytes,14,rep,name=trailers,proto3" json:"trailers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 请求Trailer
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -244,6 +245,57 @@ func (x *FetchRequest) GetParentProxy() string {
 	return ""
 }
 
+func (x *FetchRequest) GetTrailers() map[string]*HeaderValues {
+	if x != nil {
+		return x.Trailers
+	}
+	return nil
+}
+
+type HeaderValues struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeaderValues) Reset() {
+	*x = HeaderValues{}
+	mi := &file_proto_fastls_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeaderValues) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeaderValues) ProtoMessage() {}
+
+func (x *HeaderValues) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_fastls_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeaderValues.ProtoReflect.Descriptor instead.
+func (*HeaderValues) Descriptor() ([]byte, []int) {
+	return file_proto_fastls_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *HeaderValues) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
 // 指纹配置
 type Fingerprint struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -255,7 +307,7 @@ type Fingerprint struct {
 
 func (x *Fingerprint) Reset() {
 	*x = Fingerprint{}
-	mi := &file_proto_fastls_proto_msgTypes[3]
+	mi := &file_proto_fastls_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +319,7 @@ func (x *Fingerprint) String() string {
 func (*Fingerprint) ProtoMessage() {}
 
 func (x *Fingerprint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_fastls_proto_msgTypes[3]
+	mi := &file_proto_fastls_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +332,7 @@ func (x *Fingerprint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fingerprint.ProtoReflect.Descriptor instead.
 func (*Fingerprint) Descriptor() ([]byte, []int) {
-	return file_proto_fastls_proto_rawDescGZIP(), []int{3}
+	return file_proto_fastls_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Fingerprint) GetType() string {
@@ -313,7 +365,7 @@ type Cookie struct {
 
 func (x *Cookie) Reset() {
 	*x = Cookie{}
-	mi := &file_proto_fastls_proto_msgTypes[4]
+	mi := &file_proto_fastls_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -325,7 +377,7 @@ func (x *Cookie) String() string {
 func (*Cookie) ProtoMessage() {}
 
 func (x *Cookie) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_fastls_proto_msgTypes[4]
+	mi := &file_proto_fastls_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -338,7 +390,7 @@ func (x *Cookie) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cookie.ProtoReflect.Descriptor instead.
 func (*Cookie) Descriptor() ([]byte, []int) {
-	return file_proto_fastls_proto_rawDescGZIP(), []int{4}
+	return file_proto_fastls_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Cookie) GetName() string {
@@ -392,19 +444,22 @@ func (x *Cookie) GetSecure() bool {
 
 // HTTP响应
 type FetchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`                                                                                    // 是否成功
-	Status        int32                  `protobuf:"varint,2,opt,name=status,proto3" json:"status,omitempty"`                                                                            // HTTP状态码
-	Headers       map[string]string      `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 响应头
-	Body          string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                 // 响应体
-	Error         string                 `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`                                                                               // 错误信息（如果有）
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Ok            bool                     `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`                                                                                      // 是否成功
+	Status        int32                    `protobuf:"varint,2,opt,name=status,proto3" json:"status,omitempty"`                                                                              // HTTP状态码
+	Headers       map[string]string        `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`   // 响应头
+	Body          string                   `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                   // 响应体
+	Error         string                   `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`                                                                                 // 错误信息（如果有）
+	Protocol      string                   `protobuf:"bytes,6,opt,name=protocol,proto3" json:"protocol,omitempty"`                                                                           // 最终HTTP协议
+	FinalUrl      string                   `protobuf:"bytes,7,opt,name=final_url,json=finalUrl,proto3" json:"final_url,omitempty"`                                                           // 跳转后的最终URL
+	Trailers      map[string]*HeaderValues `protobuf:"bytes,8,rep,name=trailers,proto3" json:"trailers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 响应Trailer
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FetchResponse) Reset() {
 	*x = FetchResponse{}
-	mi := &file_proto_fastls_proto_msgTypes[5]
+	mi := &file_proto_fastls_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -416,7 +471,7 @@ func (x *FetchResponse) String() string {
 func (*FetchResponse) ProtoMessage() {}
 
 func (x *FetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_fastls_proto_msgTypes[5]
+	mi := &file_proto_fastls_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -429,7 +484,7 @@ func (x *FetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchResponse.ProtoReflect.Descriptor instead.
 func (*FetchResponse) Descriptor() ([]byte, []int) {
-	return file_proto_fastls_proto_rawDescGZIP(), []int{5}
+	return file_proto_fastls_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *FetchResponse) GetOk() bool {
@@ -467,6 +522,27 @@ func (x *FetchResponse) GetError() string {
 	return ""
 }
 
+func (x *FetchResponse) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *FetchResponse) GetFinalUrl() string {
+	if x != nil {
+		return x.FinalUrl
+	}
+	return ""
+}
+
+func (x *FetchResponse) GetTrailers() map[string]*HeaderValues {
+	if x != nil {
+		return x.Trailers
+	}
+	return nil
+}
+
 var File_proto_fastls_proto protoreflect.FileDescriptor
 
 const file_proto_fastls_proto_rawDesc = "" +
@@ -474,7 +550,7 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x12proto/fastls.proto\x12\x06fastls\"\x0f\n" +
 	"\rHealthRequest\"(\n" +
 	"\x0eHealthResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\x91\x04\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"\xa4\x05\n" +
 	"\fFetchRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12;\n" +
@@ -490,10 +566,16 @@ const file_proto_fastls_proto_rawDesc = "" +
 	" \x01(\tR\abrowser\x12(\n" +
 	"\acookies\x18\v \x03(\v2\x0e.fastls.CookieR\acookies\x122\n" +
 	"\x15http2_settings_string\x18\f \x01(\tR\x13http2SettingsString\x12!\n" +
-	"\fparent_proxy\x18\r \x01(\tR\vparentProxy\x1a:\n" +
+	"\fparent_proxy\x18\r \x01(\tR\vparentProxy\x12>\n" +
+	"\btrailers\x18\x0e \x03(\v2\".fastls.FetchRequest.TrailersEntryR\btrailers\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"7\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aQ\n" +
+	"\rTrailersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.fastls.HeaderValuesR\x05value:\x028\x01\"&\n" +
+	"\fHeaderValues\x12\x16\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"7\n" +
 	"\vFingerprint\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"\xad\x01\n" +
@@ -504,16 +586,22 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x06domain\x18\x04 \x01(\tR\x06domain\x12\x18\n" +
 	"\aexpires\x18\x05 \x01(\x03R\aexpires\x12\x1b\n" +
 	"\thttp_only\x18\x06 \x01(\bR\bhttpOnly\x12\x16\n" +
-	"\x06secure\x18\a \x01(\bR\x06secure\"\xdb\x01\n" +
+	"\x06secure\x18\a \x01(\bR\x06secure\"\xa8\x03\n" +
 	"\rFetchResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\x05R\x06status\x12<\n" +
 	"\aheaders\x18\x03 \x03(\v2\".fastls.FetchResponse.HeadersEntryR\aheaders\x12\x12\n" +
 	"\x04body\x18\x04 \x01(\tR\x04body\x12\x14\n" +
-	"\x05error\x18\x05 \x01(\tR\x05error\x1a:\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\x12\x1a\n" +
+	"\bprotocol\x18\x06 \x01(\tR\bprotocol\x12\x1b\n" +
+	"\tfinal_url\x18\a \x01(\tR\bfinalUrl\x12?\n" +
+	"\btrailers\x18\b \x03(\v2#.fastls.FetchResponse.TrailersEntryR\btrailers\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012~\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aQ\n" +
+	"\rTrailersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.fastls.HeaderValuesR\x05value:\x028\x012~\n" +
 	"\rFastlsService\x127\n" +
 	"\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x124\n" +
 	"\x05Fetch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB*Z(github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3"
@@ -530,31 +618,38 @@ func file_proto_fastls_proto_rawDescGZIP() []byte {
 	return file_proto_fastls_proto_rawDescData
 }
 
-var file_proto_fastls_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_proto_fastls_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_proto_fastls_proto_goTypes = []any{
 	(*HealthRequest)(nil),  // 0: fastls.HealthRequest
 	(*HealthResponse)(nil), // 1: fastls.HealthResponse
 	(*FetchRequest)(nil),   // 2: fastls.FetchRequest
-	(*Fingerprint)(nil),    // 3: fastls.Fingerprint
-	(*Cookie)(nil),         // 4: fastls.Cookie
-	(*FetchResponse)(nil),  // 5: fastls.FetchResponse
-	nil,                    // 6: fastls.FetchRequest.HeadersEntry
-	nil,                    // 7: fastls.FetchResponse.HeadersEntry
+	(*HeaderValues)(nil),   // 3: fastls.HeaderValues
+	(*Fingerprint)(nil),    // 4: fastls.Fingerprint
+	(*Cookie)(nil),         // 5: fastls.Cookie
+	(*FetchResponse)(nil),  // 6: fastls.FetchResponse
+	nil,                    // 7: fastls.FetchRequest.HeadersEntry
+	nil,                    // 8: fastls.FetchRequest.TrailersEntry
+	nil,                    // 9: fastls.FetchResponse.HeadersEntry
+	nil,                    // 10: fastls.FetchResponse.TrailersEntry
 }
 var file_proto_fastls_proto_depIdxs = []int32{
-	6, // 0: fastls.FetchRequest.headers:type_name -> fastls.FetchRequest.HeadersEntry
-	3, // 1: fastls.FetchRequest.fingerprint:type_name -> fastls.Fingerprint
-	4, // 2: fastls.FetchRequest.cookies:type_name -> fastls.Cookie
-	7, // 3: fastls.FetchResponse.headers:type_name -> fastls.FetchResponse.HeadersEntry
-	0, // 4: fastls.FastlsService.Health:input_type -> fastls.HealthRequest
-	2, // 5: fastls.FastlsService.Fetch:input_type -> fastls.FetchRequest
-	1, // 6: fastls.FastlsService.Health:output_type -> fastls.HealthResponse
-	5, // 7: fastls.FastlsService.Fetch:output_type -> fastls.FetchResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7,  // 0: fastls.FetchRequest.headers:type_name -> fastls.FetchRequest.HeadersEntry
+	4,  // 1: fastls.FetchRequest.fingerprint:type_name -> fastls.Fingerprint
+	5,  // 2: fastls.FetchRequest.cookies:type_name -> fastls.Cookie
+	8,  // 3: fastls.FetchRequest.trailers:type_name -> fastls.FetchRequest.TrailersEntry
+	9,  // 4: fastls.FetchResponse.headers:type_name -> fastls.FetchResponse.HeadersEntry
+	10, // 5: fastls.FetchResponse.trailers:type_name -> fastls.FetchResponse.TrailersEntry
+	3,  // 6: fastls.FetchRequest.TrailersEntry.value:type_name -> fastls.HeaderValues
+	3,  // 7: fastls.FetchResponse.TrailersEntry.value:type_name -> fastls.HeaderValues
+	0,  // 8: fastls.FastlsService.Health:input_type -> fastls.HealthRequest
+	2,  // 9: fastls.FastlsService.Fetch:input_type -> fastls.FetchRequest
+	1,  // 10: fastls.FastlsService.Health:output_type -> fastls.HealthResponse
+	6,  // 11: fastls.FastlsService.Fetch:output_type -> fastls.FetchResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_fastls_proto_init() }
@@ -568,7 +663,7 @@ func file_proto_fastls_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_fastls_proto_rawDesc), len(file_proto_fastls_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

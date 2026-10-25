@@ -42,6 +42,7 @@ go build -o fastls-jsonrpc.exe ./jsonrpc
 - ✅ TLS 指纹伪装（JA3/JA4R）
 - ✅ 浏览器预设支持（Chrome、Firefox、Edge等）
 - ✅ 自动响应解压缩
+- ✅ 请求/响应 Trailer，以及最终协议和重定向后 URL 元数据
 - ✅ 代理支持
 - ✅ CORS 支持
 - ✅ 4 MiB JSON 请求体上限；凭据跨域请求使用显式来源响应

@@ -77,6 +77,11 @@ func TestFetchAgainstLocalTarget(t *testing.T) {
 			http.Redirect(w, r, "/final", http.StatusFound)
 		case "/final":
 			_, _ = io.WriteString(w, "redirected")
+		case "/metadata":
+			_, _ = io.ReadAll(r.Body)
+			w.Header().Set("Trailer", "X-Response-Trailer")
+			_, _ = io.WriteString(w, r.Trailer.Get("X-Request-Trailer"))
+			w.Header().Set("X-Response-Trailer", "response-value")
 		default:
 			http.NotFound(w, r)
 		}
@@ -106,6 +111,15 @@ func TestFetchAgainstLocalTarget(t *testing.T) {
 	})
 	if err != nil || !result.OK || result.Status != http.StatusFound {
 		t.Fatalf("redirect was not disabled: result=%+v err=%v", result, err)
+	}
+
+	result, err = Fetch(context.Background(), fastls.NewClient(), Params{
+		URL: target.URL + "/metadata", Method: http.MethodPost, Body: "payload",
+		Trailers: http.Header{"X-Request-Trailer": {"request-value"}},
+	})
+	if err != nil || !result.OK || result.Body != "request-value" || result.Protocol != "HTTP/1.1" ||
+		result.FinalURL != target.URL+"/metadata" || result.Trailers.Get("X-Response-Trailer") != "response-value" {
+		t.Fatalf("unexpected metadata result: result=%+v err=%v", result, err)
 	}
 }
 

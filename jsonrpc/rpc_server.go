@@ -51,6 +51,7 @@ type FetchParams struct {
 	URL                 string            `json:"url" binding:"required"`
 	Method              string            `json:"method"`
 	Headers             map[string]string `json:"headers"`
+	Trailers            http.Header       `json:"trailers,omitempty"`
 	Body                string            `json:"body"`
 	Proxy               string            `json:"proxy"`
 	Timeout             int               `json:"timeout"`
@@ -65,11 +66,14 @@ type FetchParams struct {
 
 // FetchResult 请求结果
 type FetchResult struct {
-	OK      bool              `json:"ok"`
-	Status  int               `json:"status"`
-	Headers map[string]string `json:"headers"`
-	Body    string            `json:"body"`
-	Error   string            `json:"error,omitempty"`
+	OK       bool              `json:"ok"`
+	Status   int               `json:"status"`
+	Protocol string            `json:"protocol,omitempty"`
+	FinalURL string            `json:"final_url,omitempty"`
+	Headers  map[string]string `json:"headers"`
+	Trailers http.Header       `json:"trailers,omitempty"`
+	Body     string            `json:"body"`
+	Error    string            `json:"error,omitempty"`
 }
 
 // RPCServer RPC服务器
@@ -177,7 +181,7 @@ func (s *RPCServer) handleFetch(ctx context.Context, params json.RawMessage) (in
 		fingerprintValue = p.Fingerprint["value"]
 	}
 	result, err := fetchservice.Fetch(ctx, s.client, fetchservice.Params{
-		URL: p.URL, Method: p.Method, Headers: p.Headers, Body: p.Body,
+		URL: p.URL, Method: p.Method, Headers: p.Headers, Trailers: p.Trailers, Body: p.Body,
 		Proxy: p.Proxy, ParentProxy: p.ParentProxy, Timeout: p.Timeout,
 		DisableRedirect: p.DisableRedirect, UserAgent: p.UserAgent,
 		FingerprintSet: p.Fingerprint != nil, FingerprintType: fingerprintType, FingerprintValue: fingerprintValue,

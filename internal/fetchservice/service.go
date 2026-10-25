@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/http"
 
 	fastls "github.com/FastTLS/fastls"
 	profileprovider "github.com/FastTLS/fastls-rpc/internal/fingerprint"
@@ -17,6 +18,7 @@ type Params struct {
 	URL                 string
 	Method              string
 	Headers             map[string]string
+	Trailers            http.Header
 	Body                string
 	Proxy               string
 	ParentProxy         string
@@ -33,11 +35,14 @@ type Params struct {
 
 // Result is the transport-independent fetch response.
 type Result struct {
-	OK      bool
-	Status  int
-	Headers map[string]string
-	Body    string
-	Error   string
+	OK       bool
+	Status   int
+	Protocol string
+	FinalURL string
+	Headers  map[string]string
+	Trailers http.Header
+	Body     string
+	Error    string
 }
 
 // ConfigError identifies request configuration failures that callers should
@@ -69,6 +74,7 @@ func BuildOptions(params Params) (fastls.Options, error) {
 	options := fastls.Options{
 		Headers:         maps.Clone(params.Headers),
 		Body:            params.Body,
+		Trailers:        params.Trailers.Clone(),
 		Proxy:           params.Proxy,
 		Timeout:         params.Timeout,
 		DisableRedirect: params.DisableRedirect,
@@ -134,12 +140,12 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 	}
 	defer response.Client.CloseIdleConnections()
 	if requestErr != nil {
-		return Result{Status: response.Status, Error: requestErr.Error()}, nil
+		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: requestErr.Error()}, nil
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return Result{Status: response.Status, Error: "读取响应体失败: " + err.Error()}, nil
+		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: "读取响应体失败: " + err.Error()}, nil
 	}
 
 	decodedBody := string(body)
@@ -150,9 +156,12 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 	}
 
 	return Result{
-		OK:      true,
-		Status:  response.Status,
-		Headers: response.Headers,
-		Body:    decodedBody,
+		OK:       true,
+		Status:   response.Status,
+		Protocol: response.Protocol,
+		FinalURL: response.FinalURL,
+		Headers:  response.Headers,
+		Trailers: response.Trailer.Clone(),
+		Body:     decodedBody,
 	}, nil
 }

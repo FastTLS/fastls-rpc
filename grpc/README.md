@@ -62,6 +62,7 @@ go build -o fastls-grpc.exe ./grpc
 - ✅ TLS 指纹伪装（JA3/JA4R）
 - ✅ 浏览器预设支持（Chrome、Firefox、Edge等）
 - ✅ 自动响应解压缩
+- ✅ 请求/响应 Trailer，以及最终协议和重定向后 URL 元数据
 - ✅ 代理支持
 
 ## 客户端示例

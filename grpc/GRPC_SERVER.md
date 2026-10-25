@@ -71,6 +71,7 @@ message HealthResponse {
 | url | string | 请求URL（必填） |
 | method | string | HTTP方法，默认 "GET" |
 | headers | map<string, string> | 请求头 |
+| trailers | map<string, HeaderValues> | 请求 Trailer；每个字段可含多个值 |
 | body | string | 请求体 |
 | proxy | string | 代理地址 |
 | parent_proxy | string | 上级代理地址；设置后覆盖 `proxy` |
@@ -93,6 +94,9 @@ message FetchResponse {
   map<string, string> headers = 3;   // 响应头
   string body = 4;                    // 响应体
   string error = 5;                   // 错误信息
+  string protocol = 6;                // 最终HTTP协议
+  string final_url = 7;               // 重定向后的最终URL
+  map<string, HeaderValues> trailers = 8; // 响应Trailer
 }
 ```
 

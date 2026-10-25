@@ -91,7 +91,7 @@ go build ./...
 
 GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依赖策略、单元/集成测试、竞态检测、覆盖率、静态检查、两种服务构建和 CLI 冒烟测试。`main` 分支会生成同时包含两个二进制的六个平台开发包、SHA-256 校验和与 Sigstore/GitHub 来源证明，并在上传前完成验证。
 
-本地集成测试共用环回目标与 CONNECT 代理夹具，覆盖请求体/请求头/Cookie、压缩响应、禁用重定向、代理优先级、取消传播、JSON-RPC 的 CORS/请求大小边界，以及两个 RPC 适配层的字段映射；不访问公网。
+本地集成测试共用环回目标与 CONNECT 代理夹具，覆盖请求体/请求头/Cookie、请求与响应 Trailer、最终协议/URL、压缩响应、禁用重定向、代理优先级、取消传播、JSON-RPC 的 CORS/请求大小边界，以及两个 RPC 适配层的字段映射；不访问公网。
 
 默认测试还会分别构建并启动 JSON-RPC 与 gRPC CLI，通过真实 TCP 端口验证健康检查和 fetch。若同级目录存在三个迁移工作区，可运行 `GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace`，构建 Fetch、JSON-RPC、gRPC、MITM 四个进程并验证三种入口经 MITM 访问同一个环回 HTTPS 目标。专用的 Workspace integration Action 支持固定另外两个仓库的候选 ref，并保存三仓精确提交号与测试日志。
 

@@ -34,7 +34,10 @@ func BuildInDir(t testing.TB, directory, packagePath, name string) string {
 	path := filepath.Join(t.TempDir(), name)
 	command := exec.Command("go", "build", "-trimpath", "-o", path, packagePath)
 	command.Dir = directory
-	command.Env = append(os.Environ(), "GOWORK=off")
+	command.Env = os.Environ()
+	if os.Getenv("GOWORK") == "" || directory != "" {
+		command.Env = append(command.Env, "GOWORK=off")
+	}
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("build test binary: %v\n%s", err, output)
 	}

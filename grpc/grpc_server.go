@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -47,6 +48,12 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 	for k, v := range req.Headers {
 		headers[k] = v
 	}
+	trailers := make(http.Header, len(req.Trailers))
+	for key, values := range req.Trailers {
+		if values != nil {
+			trailers[key] = append([]string(nil), values.Values...)
+		}
+	}
 
 	// 构建Cookie列表
 	var cookies []fastls.Cookie
@@ -72,7 +79,7 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 		fingerprintValue = req.Fingerprint.Value
 	}
 	result, err := fetchservice.Fetch(ctx, s.client, fetchservice.Params{
-		URL: req.Url, Method: req.Method, Headers: headers, Body: req.Body,
+		URL: req.Url, Method: req.Method, Headers: headers, Trailers: trailers, Body: req.Body,
 		Proxy: req.Proxy, ParentProxy: req.ParentProxy, Timeout: int(req.Timeout),
 		DisableRedirect: req.DisableRedirect, UserAgent: req.UserAgent,
 		FingerprintSet: req.Fingerprint != nil, FingerprintType: fingerprintType, FingerprintValue: fingerprintValue,
@@ -85,9 +92,13 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	responseTrailers := make(map[string]*pb.HeaderValues, len(result.Trailers))
+	for key, values := range result.Trailers {
+		responseTrailers[key] = &pb.HeaderValues{Values: append([]string(nil), values...)}
+	}
 	return &pb.FetchResponse{
-		Ok: result.OK, Status: int32(result.Status), Headers: result.Headers,
-		Body: result.Body, Error: result.Error,
+		Ok: result.OK, Status: int32(result.Status), Protocol: result.Protocol, FinalUrl: result.FinalURL,
+		Headers: result.Headers, Trailers: responseTrailers, Body: result.Body, Error: result.Error,
 	}, nil
 }
 

@@ -142,3 +142,24 @@ func TestGRPCFetchParentProxyPrecedence(t *testing.T) {
 		t.Fatalf("unexpected response: response=%+v err=%v", response, err)
 	}
 }
+
+func TestGRPCFetchMetadataAndTrailers(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		w.Header().Set("Trailer", "X-Response-Trailer")
+		_, _ = io.WriteString(w, r.Trailer.Get("X-Request-Trailer"))
+		w.Header().Set("X-Response-Trailer", "response-value")
+	}))
+	defer target.Close()
+	response, err := NewGRPCServer().Fetch(context.Background(), &pb.FetchRequest{
+		Url: target.URL, Method: http.MethodPost, Body: "payload",
+		Trailers: map[string]*pb.HeaderValues{"X-Request-Trailer": {Values: []string{"request-value"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.Ok || response.Body != "request-value" || response.Protocol != "HTTP/1.1" || response.FinalUrl != target.URL ||
+		response.Trailers["X-Response-Trailer"].Values[0] != "response-value" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
