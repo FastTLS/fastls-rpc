@@ -196,5 +196,6 @@ func main() {
 
 	// 6. 使用代理（示例）
 	fmt.Println("6. 使用代理（示例）:")
-	fmt.Println("   (需要配置代理服务器)\n")
+	fmt.Println("   (需要配置代理服务器)")
+	fmt.Println()
 }
