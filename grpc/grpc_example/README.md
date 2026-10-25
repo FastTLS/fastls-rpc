@@ -6,7 +6,7 @@
 
 ### Go
 
-Go代码会在编译时自动生成，无需手动执行。
+Go 生成文件已提交到 `grpc/proto`，普通编译无需重新生成。只有修改 `fastls.proto` 时才运行生成命令。
 
 ### Python
 
@@ -15,7 +15,7 @@ Go代码会在编译时自动生成，无需手动执行。
 pip install grpcio grpcio-tools
 
 # 生成Python代码
-cd services/fastls-rpc/grpc/grpc_example
+cd fastls-rpc/grpc/grpc_example
 python -m grpc_tools.protoc -I../proto --python_out=. --grpc_python_out=. ../proto/fastls.proto
 ```
 
@@ -26,13 +26,8 @@ Node.js使用动态加载proto文件，无需生成代码。
 ## 启动gRPC服务器
 
 ```bash
-cd services/fastls-rpc/grpc
-# 先生成protobuf代码
-protoc --go_out=. --go_opt=paths=source_relative \
-       --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       proto/fastls.proto
-# 运行服务器
-go run grpc_server.go
+cd fastls-rpc
+go run ./grpc
 ```
 
 服务器默认运行在 `localhost:8802`
@@ -48,7 +43,7 @@ pip install grpcio
 ### 生成Python代码
 
 ```bash
-cd services/fastls-rpc
+cd fastls-rpc/grpc
 python -m grpc_tools.protoc -I./proto --python_out=./grpc_example --grpc_python_out=./grpc_example ./proto/fastls.proto
 ```
 
@@ -214,14 +209,9 @@ message FetchResponse {
 
 ## 支持的浏览器类型
 
-- `chrome` - Chrome浏览器
-- `chrome120` - Chrome 120版本
-- `chrome142` - Chrome 142版本
-- `chromium` - Chromium浏览器
-- `edge` - Microsoft Edge浏览器
-- `firefox` - Firefox浏览器
-- `safari` - Safari浏览器
-- `opera` - Opera浏览器
+- 滚动别名：`chrome`、`edge`、`firefox`、`chromium`、`safari`、`opera`
+- 版本选择器：`chrome150`…`chrome160`、`edge150`…`edge160`、`firefox151`…`firefox158`
+- 兼容保留：`chrome120`、`chrome142`、`firefox144`、`firefox147`、`firefox148`
 
 ## 指纹类型
 

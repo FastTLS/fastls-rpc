@@ -7,12 +7,11 @@
 package proto
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -106,20 +105,22 @@ func (x *HealthResponse) GetStatus() string {
 
 // HTTP请求
 type FetchRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Url             string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                                                                                   // 请求URL（必填）
-	Method          string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`                                                                             // HTTP方法，默认GET
-	Headers         map[string]string      `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 请求头
-	Body            string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                 // 请求体
-	Proxy           string                 `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`                                                                               // 代理地址
-	Timeout         int32                  `protobuf:"varint,6,opt,name=timeout,proto3" json:"timeout,omitempty"`                                                                          // 超时时间（秒），默认30
-	DisableRedirect bool                   `protobuf:"varint,7,opt,name=disable_redirect,json=disableRedirect,proto3" json:"disable_redirect,omitempty"`                                   // 是否禁用重定向
-	UserAgent       string                 `protobuf:"bytes,8,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                      // User-Agent
-	Fingerprint     *Fingerprint           `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`                                                                   // 指纹配置
-	Browser         string                 `protobuf:"bytes,10,opt,name=browser,proto3" json:"browser,omitempty"`                                                                          // 浏览器类型
-	Cookies         []*Cookie              `protobuf:"bytes,11,rep,name=cookies,proto3" json:"cookies,omitempty"`                                                                          // Cookie列表
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Url                 string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                                                                                   // 请求URL（必填）
+	Method              string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`                                                                             // HTTP方法，默认GET
+	Headers             map[string]string      `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 请求头
+	Body                string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`                                                                                 // 请求体
+	Proxy               string                 `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`                                                                               // 代理地址
+	Timeout             int32                  `protobuf:"varint,6,opt,name=timeout,proto3" json:"timeout,omitempty"`                                                                          // 超时时间（秒），默认30
+	DisableRedirect     bool                   `protobuf:"varint,7,opt,name=disable_redirect,json=disableRedirect,proto3" json:"disable_redirect,omitempty"`                                   // 是否禁用重定向
+	UserAgent           string                 `protobuf:"bytes,8,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                      // User-Agent
+	Fingerprint         *Fingerprint           `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`                                                                   // 指纹配置
+	Browser             string                 `protobuf:"bytes,10,opt,name=browser,proto3" json:"browser,omitempty"`                                                                          // 浏览器类型
+	Cookies             []*Cookie              `protobuf:"bytes,11,rep,name=cookies,proto3" json:"cookies,omitempty"`                                                                          // Cookie列表
+	Http2SettingsString string                 `protobuf:"bytes,12,opt,name=http2_settings_string,json=http2SettingsString,proto3" json:"http2_settings_string,omitempty"`                     // HTTP/2设置字符串
+	ParentProxy         string                 `protobuf:"bytes,13,opt,name=parent_proxy,json=parentProxy,proto3" json:"parent_proxy,omitempty"`                                               // 上级代理地址（通过参数传递）
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *FetchRequest) Reset() {
@@ -227,6 +228,20 @@ func (x *FetchRequest) GetCookies() []*Cookie {
 		return x.Cookies
 	}
 	return nil
+}
+
+func (x *FetchRequest) GetHttp2SettingsString() string {
+	if x != nil {
+		return x.Http2SettingsString
+	}
+	return ""
+}
+
+func (x *FetchRequest) GetParentProxy() string {
+	if x != nil {
+		return x.ParentProxy
+	}
+	return ""
 }
 
 // 指纹配置
@@ -459,7 +474,7 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x12proto/fastls.proto\x12\x06fastls\"\x0f\n" +
 	"\rHealthRequest\"(\n" +
 	"\x0eHealthResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\xba\x03\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"\x91\x04\n" +
 	"\fFetchRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12;\n" +
@@ -473,7 +488,9 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\vfingerprint\x18\t \x01(\v2\x13.fastls.FingerprintR\vfingerprint\x12\x18\n" +
 	"\abrowser\x18\n" +
 	" \x01(\tR\abrowser\x12(\n" +
-	"\acookies\x18\v \x03(\v2\x0e.fastls.CookieR\acookies\x1a:\n" +
+	"\acookies\x18\v \x03(\v2\x0e.fastls.CookieR\acookies\x122\n" +
+	"\x15http2_settings_string\x18\f \x01(\tR\x13http2SettingsString\x12!\n" +
+	"\fparent_proxy\x18\r \x01(\tR\vparentProxy\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"7\n" +
@@ -499,7 +516,7 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012~\n" +
 	"\rFastlsService\x127\n" +
 	"\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x124\n" +
-	"\x05Fetch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB3Z1github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3"
+	"\x05Fetch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB*Z(github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3"
 
 var (
 	file_proto_fastls_proto_rawDescOnce sync.Once

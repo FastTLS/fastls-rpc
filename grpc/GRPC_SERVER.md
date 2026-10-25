@@ -6,32 +6,28 @@
 
 ### 安装依赖
 
-```bash
-go get google.golang.org/grpc
-go get google.golang.org/protobuf/cmd/protoc-gen-go
-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
-```
+普通构建在仓库根目录执行 `go mod download`。只有修改 `.proto` 时才需要 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0。
 
 ### 生成代码
 
 ```bash
-cd services/fastls-rpc/grpc
+cd fastls-rpc
 protoc --go_out=. --go_opt=paths=source_relative \
        --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       proto/fastls.proto
+       grpc/proto/fastls.proto
 ```
 
 ### 编译
 
 ```bash
-cd services/fastls-rpc/grpc
-go build -o grpc_server.exe grpc_server.go
+cd fastls-rpc
+go build -o fastls-grpc.exe ./grpc
 ```
 
 ### 运行
 
 ```bash
-./grpc_server.exe
+./fastls-grpc.exe
 ```
 
 服务器默认运行在 `localhost:8802`
@@ -98,14 +94,9 @@ message FetchResponse {
 
 ## 支持的浏览器类型
 
-- `chrome` - Chrome浏览器
-- `chrome120` - Chrome 120版本
-- `chrome142` - Chrome 142版本
-- `chromium` - Chromium浏览器
-- `edge` - Microsoft Edge浏览器
-- `firefox` - Firefox浏览器
-- `safari` - Safari浏览器
-- `opera` - Opera浏览器
+- 滚动别名：`chrome`、`edge`、`firefox`、`chromium`、`safari`、`opera`
+- 版本选择器：`chrome150`…`chrome160`、`edge150`…`edge160`、`firefox151`…`firefox158`
+- 兼容保留：`chrome120`、`chrome142`、`firefox144`、`firefox147`、`firefox148`
 
 ## 指纹类型
 
@@ -232,5 +223,5 @@ conn, err := grpc.Dial("localhost:8802", grpc.WithTransportCredentials(creds))
 ## 相关文档
 
 - [gRPC客户端示例说明](./grpc_example/README.md) - 各语言客户端的使用方法
-- [JSON-RPC服务器文档](./RPC_SERVER.md) - JSON-RPC 2.0 服务器文档
+- [JSON-RPC服务器文档](../jsonrpc/RPC_SERVER.md) - JSON-RPC 2.0 服务器文档
 
