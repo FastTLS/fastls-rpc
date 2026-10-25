@@ -32,6 +32,8 @@ go build -o build/fastls-grpc ./grpc
 
 服务生命周期逻辑位于 `internal/serverlifecycle`。相关变更必须通过环回监听器验证 context 取消、停止接受新连接，并确认活动 HTTP/RPC 在超时窗口内完成后才退出。
 
+JSON-RPC HTTP 入口变更必须覆盖 CORS 凭据语义和 4 MiB 请求体边界；超限响应同时验证 HTTP `413` 与 JSON-RPC `-32600`。
+
 ## Protobuf 变更
 
 `grpc/proto/fastls.proto` 是接口源。当前 Go 生成基线为 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0；Python 生成基线为 `grpcio-tools` 1.76.0（Protobuf Python 6.31.1）。只有 `.proto` 变化或修复生成文件时才重新生成：

@@ -44,6 +44,7 @@ go build -o fastls-jsonrpc.exe ./jsonrpc
 - ✅ 自动响应解压缩
 - ✅ 代理支持
 - ✅ CORS 支持
+- ✅ 4 MiB JSON 请求体上限；凭据跨域请求使用显式来源响应
 
 ## 客户端示例
 

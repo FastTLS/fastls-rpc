@@ -161,6 +161,8 @@ go build -o fastls-jsonrpc.exe ./jsonrpc
 | -32602 | Invalid params - 无效参数 |
 | -32603 | Internal error - 内部错误 |
 
+JSON 请求体上限为 4 MiB。超过限制时 HTTP 状态为 `413`，响应中的 JSON-RPC 错误代码为 `-32600`。
+
 ## 使用示例
 
 ### cURL
@@ -242,8 +244,8 @@ req.end();
 
 ## 注意事项
 
-1. 服务器默认监听 `:8801` 端口，可以通过修改代码中的 `port` 变量来更改
-2. 所有请求都支持 CORS，允许跨域访问
+1. 服务器默认监听 `:8801` 端口，可通过 `-addr`/`-a` 参数更改
+2. 所有请求都支持 CORS；携带凭据时服务会显式回显请求的 `Origin` 并返回 `Vary: Origin`
 3. 响应体会自动解压缩（支持 gzip、deflate、br、zstd）
 4. 超时时间默认为 30 秒，可以通过 `timeout` 参数自定义
 5. 支持 HTTP 和 HTTPS 请求

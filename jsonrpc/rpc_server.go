@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -18,6 +20,8 @@ import (
 	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"github.com/gin-gonic/gin"
 )
+
+const maxRPCRequestBodySize = 4 << 20
 
 // JSONRPCRequest JSON-RPC 2.0 请求结构
 type JSONRPCRequest struct {
@@ -85,6 +89,19 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 	var req JSONRPCRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			c.JSON(http.StatusRequestEntityTooLarge, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error: &RPCError{
+					Code:    -32600,
+					Message: "Invalid Request",
+					Data:    fmt.Sprintf("request body exceeds %d byte limit", maxBytesError.Limit),
+				},
+				ID: nil,
+			})
+			return
+		}
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &RPCError{
@@ -247,6 +264,7 @@ func main() {
 
 func newJSONRPCRouter(rpcServer *RPCServer) *gin.Engine {
 	r := gin.Default()
+	r.Use(rpcRequestBodyLimit(maxRPCRequestBodySize))
 	r.Use(rpcCorsMiddleware())
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -255,15 +273,32 @@ func newJSONRPCRouter(rpcServer *RPCServer) *gin.Engine {
 	return r
 }
 
+func rpcRequestBodyLimit(limit int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Body != nil {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+		}
+		c.Next()
+	}
+}
+
 // rpcCorsMiddleware CORS中间件
 func rpcCorsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.GetHeader("Origin")
+		if origin == "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			c.Writer.Header().Add("Vary", "Origin")
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
+			c.Writer.Header().Add("Vary", "Access-Control-Request-Method")
+			c.Writer.Header().Add("Vary", "Access-Control-Request-Headers")
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
