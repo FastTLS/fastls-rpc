@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -153,6 +154,13 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 		assertFetchRejectsInvalidConfiguration(t, "http://"+fetchAddress+"/fetch", fetchProcess)
 		assertJSONRPCRejectsInvalidConfiguration(t, "http://"+jsonRPCAddress+"/rpc", jsonRPCProcess)
 		assertGRPCRejectsInvalidConfiguration(t, grpcAddress, grpcProcess)
+	})
+
+	t.Run("oversized requests are rejected", func(t *testing.T) {
+		body := strings.Repeat("x", (4<<20)+1)
+		assertFetchRejectsOversizedRequest(t, "http://"+fetchAddress+"/fetch", body, fetchProcess)
+		assertJSONRPCRejectsOversizedRequest(t, "http://"+jsonRPCAddress+"/rpc", body, jsonRPCProcess)
+		assertGRPCRejectsOversizedRequest(t, grpcAddress, body, grpcProcess)
 	})
 
 	t.Run("rejected proxy never falls back to direct", func(t *testing.T) {
@@ -307,6 +315,53 @@ func assertGRPCRejectsInvalidConfiguration(t testing.TB, address string, process
 	_, err := client.Fetch(ctx, &pb.FetchRequest{Url: "https://invalid.test", Timeout: -1})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("gRPC invalid configuration error = %v, want InvalidArgument\n%s", err, process.Logs())
+	}
+}
+
+func assertFetchRejectsOversizedRequest(t testing.TB, endpoint, body string, process *testprocess.Process) {
+	t.Helper()
+	var response struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	postJSONStatus(t, endpoint, map[string]any{
+		"url": "https://oversized.invalid", "body": body,
+	}, &response, http.StatusRequestEntityTooLarge, process)
+	if response.OK || response.Error == "" {
+		t.Fatalf("fetch oversized request response: %+v", response)
+	}
+}
+
+func assertJSONRPCRejectsOversizedRequest(t testing.TB, endpoint, body string, process *testprocess.Process) {
+	t.Helper()
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "fetch",
+		"params":  map[string]any{"url": "https://oversized.invalid", "body": body},
+		"id":      1,
+	}
+	var response struct {
+		Error *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+			Data    any    `json:"data"`
+		} `json:"error"`
+	}
+	postJSONStatus(t, endpoint, payload, &response, http.StatusRequestEntityTooLarge, process)
+	if response.Error == nil || response.Error.Code != -32600 {
+		t.Fatalf("JSON-RPC oversized request response: %+v", response)
+	}
+}
+
+func assertGRPCRejectsOversizedRequest(t testing.TB, address, body string, process *testprocess.Process) {
+	t.Helper()
+	connection, client := newGRPCClient(t, address)
+	defer connection.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := client.Fetch(ctx, &pb.FetchRequest{Url: "https://oversized.invalid", Body: body})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("gRPC oversized request error = %v, want ResourceExhausted\n%s", err, process.Logs())
 	}
 }
 
