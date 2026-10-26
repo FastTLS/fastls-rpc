@@ -1,5 +1,7 @@
 # fastls-rpc
 
+[English documentation](https://fasttls.github.io/en/ecosystem/fastls-rpc)
+
 FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
 > 当前状态：`v0.1.0` 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
@@ -12,8 +14,10 @@ FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种�
 
 | 服务 | 二进制 | 默认地址 | 接口 |
 | --- | --- | --- | --- |
-| JSON-RPC 2.0 | `fastls-jsonrpc` | `127.0.0.1:8801` | `POST /rpc`、`GET /health` |
-| gRPC | `fastls-grpc` | `127.0.0.1:8802` | `FastlsService.Health`、`FastlsService.Fetch` |
+| JSON-RPC 2.0 | `fastls-jsonrpc` | `:8801` | `POST /rpc`、`GET /health` |
+| gRPC | `fastls-grpc` | `:8802` | `FastlsService.Health`、`FastlsService.Fetch` |
+
+默认 `:8801` / `:8802` 会监听所有可用接口，并非仅环回。下面运行命令显式限制为 127.0.0.1；开放访问前需配置访问控制。
 
 JSON-RPC 适合无需生成客户端的 HTTP 集成；gRPC 适合需要 Protobuf 类型约束和标准 gRPC 工具链的场景。
 
@@ -76,7 +80,7 @@ JSON-RPC 与 gRPC 共用同一请求执行层和字段优先级：`parent_proxy`
 fastls-rpc
   ├─ jsonrpc / grpc
   └─ fastls
-      ├─ ftransport       HTTP/1.1、HTTP/2、HTTP/3 传输
+      ├─ ftransport       HTTP/1.1、HTTP/2 传输（H3 为核心独立路径）
       ├─ fastls/profile   指纹模型
       └─ imitate          浏览器预设
 ```
