@@ -32,7 +32,7 @@ go build -o build/fastls-grpc ./grpc
 
 服务生命周期逻辑位于 `internal/serverlifecycle`。相关变更必须通过环回监听器验证 context 取消、停止接受新连接，并确认活动 HTTP/RPC 在超时窗口内完成后才退出。
 
-JSON-RPC HTTP 入口变更必须覆盖 CORS 凭据语义和 4 MiB 请求体边界；超限响应同时验证 HTTP `413` 与 JSON-RPC `-32600`。
+JSON-RPC HTTP入口变更必须覆盖CORS凭据语义、默认4MiB及可配置max-request-bytes边界（完整正文/尾部空白/chunked）；超限同时验证HTTP413与JSON-RPC -32600。gRPC验证完整protobuf精确大小、压缩后解压超限，以及提高默认4MiB限制后的真实传输；不能仅直接调用服务方法冒充框架消息验收。
 
 `jsonrpc/binary_e2e_test.go` 与 `grpc/binary_e2e_test.go` 会分别构建并启动当前 CLI，通过真实 TCP 端口验证健康检查和 fetch 契约。进程管理统一使用 `internal/testprocess`。
 
@@ -42,7 +42,7 @@ JSON-RPC HTTP 入口变更必须覆盖 CORS 凭据语义和 4 MiB 请求体边�
 
 ## Protobuf 变更
 
-`grpc/proto/fastls.proto` 是接口源。当前 Go 生成基线为 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0；Python 生成基线为 `grpcio-tools` 1.76.0（Protobuf Python 6.31.1）。只有 `.proto` 变化或修复生成文件时才重新生成：
+`grpc/proto/fastls.proto` 是接口源。P03-A消息代码使用 `grpcio-tools` 1.76.0内置的protoc 31.1、`protoc-gen-go` v1.36.11生成Go与Python消息描述；服务签名未改，原 `protoc-gen-go-grpc` v1.6.0服务桩保留。只有 `.proto` 变化或修复生成文件时才重新生成：
 
 ```bash
 protoc --go_out=. --go_opt=paths=source_relative \

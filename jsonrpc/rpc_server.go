@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -48,6 +50,7 @@ type RPCError struct {
 
 // FetchParams 请求参数
 type FetchParams struct {
+	IncludeBodyBase64   bool              `json:"include_body_base64"`
 	URL                 string            `json:"url" binding:"required"`
 	Method              string            `json:"method"`
 	Headers             map[string]string `json:"headers"`
@@ -66,26 +69,41 @@ type FetchParams struct {
 
 // FetchResult 请求结果
 type FetchResult struct {
-	OK       bool              `json:"ok"`
-	Status   int               `json:"status"`
-	Protocol string            `json:"protocol,omitempty"`
-	FinalURL string            `json:"final_url,omitempty"`
-	Headers  map[string]string `json:"headers"`
-	Trailers http.Header       `json:"trailers,omitempty"`
-	Body     string            `json:"body"`
-	Error    string            `json:"error,omitempty"`
+	OK           bool              `json:"ok"`
+	Status       int               `json:"status"`
+	Protocol     string            `json:"protocol,omitempty"`
+	FinalURL     string            `json:"final_url,omitempty"`
+	Headers      map[string]string `json:"headers"`
+	Trailers     http.Header       `json:"trailers,omitempty"`
+	Body         string            `json:"body"`
+	Error        string            `json:"error,omitempty"`
+	HeaderValues http.Header       `json:"header_values,omitempty"`
+	BodyBase64   string            `json:"body_base64,omitempty"`
+	ErrorCode    string            `json:"error_code,omitempty"`
+	TimeoutPhase string            `json:"timeout_phase,omitempty"`
 }
 
 // RPCServer RPC服务器
 type RPCServer struct {
-	client fastls.Fastls
+	executor *fetchservice.Executor
 }
 
 // NewRPCServer 创建新的RPC服务器
 func NewRPCServer() *RPCServer {
-	return &RPCServer{
-		client: fastls.NewClient(),
+	s, _ := NewRPCServerWithLimits(fetchservice.Limits{})
+	return s
+}
+
+func NewRPCServerWithLimits(limits fetchservice.Limits) (*RPCServer, error) {
+	return NewRPCServerWithConfig(fetchservice.Config{Limits: limits})
+}
+
+func NewRPCServerWithConfig(config fetchservice.Config) (*RPCServer, error) {
+	executor, err := fetchservice.NewExecutorWithConfig(config)
+	if err != nil {
+		return nil, err
 	}
+	return &RPCServer{executor: executor}, nil
 }
 
 // handleRPC 处理RPC请求
@@ -180,8 +198,9 @@ func (s *RPCServer) handleFetch(ctx context.Context, params json.RawMessage) (in
 		fingerprintType = p.Fingerprint["type"]
 		fingerprintValue = p.Fingerprint["value"]
 	}
-	result, err := fetchservice.Fetch(ctx, s.client, fetchservice.Params{
-		URL: p.URL, Method: p.Method, Headers: p.Headers, Trailers: p.Trailers, Body: p.Body,
+	result, err := s.executor.Fetch(ctx, fetchservice.Params{
+		IncludeBodyBase64: p.IncludeBodyBase64,
+		URL:               p.URL, Method: p.Method, Headers: p.Headers, Trailers: p.Trailers, Body: p.Body,
 		Proxy: p.Proxy, ParentProxy: p.ParentProxy, Timeout: p.Timeout,
 		DisableRedirect: p.DisableRedirect, UserAgent: p.UserAgent,
 		FingerprintSet: p.Fingerprint != nil, FingerprintType: fingerprintType, FingerprintValue: fingerprintValue,
@@ -199,15 +218,23 @@ func (s *RPCServer) handleFetch(ctx context.Context, params json.RawMessage) (in
 
 func main() {
 	var (
-		addr        string
-		debug       bool
-		showVersion bool
-		showHelp    bool
+		addr           string
+		debug          bool
+		showVersion    bool
+		showHelp       bool
+		maximum        int64
+		requestMaximum int64
+		inflight       int
+		policyFile     string
 	)
 
 	// 定义完整参数和缩写参数
 	flag.StringVar(&addr, "addr", ":8801", "监听地址 (例如: :8801 或 0.0.0.0:8801)")
 	flag.StringVar(&addr, "a", ":8801", "监听地址 (addr 的缩写)")
+	flag.Int64Var(&maximum, "max-response-bytes", 0, "Maximum wire and decoded response bytes; 0 is unlimited")
+	flag.Int64Var(&requestMaximum, "max-request-bytes", 4<<20, "Maximum complete JSON request bytes (1..64 MiB); 0 selects 4 MiB")
+	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
+	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -238,7 +265,10 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// 创建RPC服务器
-	rpcServer := NewRPCServer()
+	rpcServer, err := NewRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// 创建gin路由
 	if debug {
@@ -268,19 +298,33 @@ func main() {
 
 func newJSONRPCRouter(rpcServer *RPCServer) *gin.Engine {
 	r := gin.Default()
-	r.Use(rpcRequestBodyLimit(maxRPCRequestBodySize))
 	r.Use(rpcCorsMiddleware())
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	r.POST("/rpc", rpcServer.handleRPC)
+	r.POST("/rpc", rpcRequestBodyLimit(rpcServer.executor.RequestMaximum()), rpcServer.handleRPC)
 	return r
 }
 
 func rpcRequestBodyLimit(limit int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Body != nil {
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+			body := http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+			data, err := io.ReadAll(body)
+			body.Close()
+			if err != nil {
+				status, code, message := http.StatusOK, -32700, "Parse error"
+				detail := err.Error()
+				var tooLarge *http.MaxBytesError
+				if errors.As(err, &tooLarge) {
+					status, code = http.StatusRequestEntityTooLarge, -32600
+					message = "Invalid Request"
+					detail = fmt.Sprintf("request body exceeds %d byte limit", tooLarge.Limit)
+				}
+				c.AbortWithStatusJSON(status, JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: code, Message: message, Data: detail}})
+				return
+			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(data))
 		}
 		c.Next()
 	}

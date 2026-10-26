@@ -1,0 +1,128 @@
+name: Development address policy integration
+
+# Kept separate from public-dependency gates. Reviewed development refs are
+# explicit; no release, tag, dependency rewrite, or remote branch mutation.
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Reviewed fastls ref containing WithAddressPolicyJSON and CheckAddressPolicy
+        required: true
+        default: v2
+        type: string
+      transport_ref:
+        description: Reviewed ftransport ref
+        required: true
+        default: main
+        type: string
+      fetch_ref:
+        description: Reviewed fastls-fetch ref containing the service policy flag
+        required: true
+        default: main
+        type: string
+      mitm_ref:
+        description: Reviewed fastls-mitm ref containing secure policy interception
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+        go: ['1.26.10', '1.27.3']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      GOWORK: 'off'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: workspace/fastls-rpc-ftransport
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/fastls
+          ref: ${{ inputs.core_ref }}
+          path: workspace/fastls
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/ftransport
+          ref: ${{ inputs.transport_ref }}
+          path: workspace/ftransport
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/fastls-fetch
+          ref: ${{ inputs.fetch_ref }}
+          path: workspace/fastls-fetch-ftransport
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/fastls-mitm
+          ref: ${{ inputs.mitm_ref }}
+          path: workspace/fastls-mitm-ftransport
+          persist-credentials: false
+      - name: Record reviewed sources and create explicit workspace
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p policy-evidence
+          {
+            go version
+            for module in fastls ftransport fastls-fetch-ftransport fastls-rpc-ftransport fastls-mitm-ftransport; do
+              printf '%s=%s\n' "$module" "$(git -C "$module" rev-parse HEAD)"
+            done
+          } | tee policy-evidence/revisions.txt
+          go work init ./fastls ./fastls/profile ./ftransport ./fastls-fetch-ftransport ./fastls-rpc-ftransport ./fastls-mitm-ftransport
+      - name: Enabled policy and old-core fail-closed contracts
+        working-directory: workspace/fastls-rpc-ftransport
+        env:
+          GOWORK: ${{ github.workspace }}/workspace/go.work
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=3 -tags policy_e2e -timeout 180s ./integration/policy 2>&1 | tee ../policy-evidence/policy.log
+      - name: Configured request budgets in Fetch and RPC
+        env:
+          GOWORK: ${{ github.workspace }}/workspace/go.work
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd workspace/fastls-fetch-ftransport
+          go test -count=3 -run 'TestConfiguredRequestLimit|TestRequestBudgetValidation' -timeout 120s ./... 2>&1 | tee ../policy-evidence/fetch-request-budgets.log
+          cd ../fastls-rpc-ftransport
+          go test -count=3 -run 'TestConfiguredRequestLimit|TestRequestBudget' -timeout 120s ./... 2>&1 | tee ../policy-evidence/rpc-request-budgets.log
+      - name: MITM policy, quotas, CONNECT and framing contracts
+        working-directory: workspace/fastls-mitm-ftransport
+        env:
+          GOWORK: ${{ github.workspace }}/workspace/go.work
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=3 -tags mitm_policy_e2e -timeout 180s ./... 2>&1 | tee ../policy-evidence/mitm-policy.log
+      - name: MITM enabled-policy race
+        if: runner.os == 'Linux'
+        working-directory: workspace/fastls-mitm-ftransport
+        env:
+          GOWORK: ${{ github.workspace }}/workspace/go.work
+        run: go test -race -count=1 -tags mitm_policy_e2e -timeout 180s ./...
+      - name: Upload exact source and test evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: policy-${{ matrix.os }}-go${{ matrix.go }}
+          path: workspace/policy-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
