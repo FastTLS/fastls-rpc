@@ -38,6 +38,7 @@ message FetchRequest {
   string http2_settings_string = 12; // HTTP/2设置字符串
   string parent_proxy = 13;          // 上级代理地址（通过参数传递）
   map<string, HeaderValues> trailers = 14; // 请求Trailer
+  bool include_body_base64 = 15;     // 按需附带响应原始正文Base64
 }
 
 message HeaderValues {
@@ -71,5 +72,9 @@ message FetchResponse {
   string protocol = 6;                // 最终HTTP协议
   string final_url = 7;               // 跳转后的最终URL
   map<string, HeaderValues> trailers = 8; // 响应Trailer
+  map<string, HeaderValues> header_values = 9; // 完整的多值原始响应头
+  string body_base64 = 10;             // 原始编码正文的Base64，body保留显示行为
+  string error_code = 11;              // 稳定错误分类
+  string timeout_phase = 12;           // 超时阶段，total或阶段名
 }
 

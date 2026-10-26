@@ -3,18 +3,21 @@ package fetchservice
 import (
 	"context"
 	"fmt"
-	"io"
 	"maps"
 	"net/http"
 
 	fastls "github.com/FastTLS/fastls"
 	profileprovider "github.com/FastTLS/fastls-rpc/internal/fingerprint"
+	"github.com/FastTLS/fastls-rpc/internal/responsecontract"
 )
 
 const defaultTimeoutSeconds = 30
 
 // Params is the transport-independent request contract shared by JSON-RPC and gRPC.
 type Params struct {
+	IncludeBodyBase64 bool
+	// MaxResponseBytes is set by the service operator, never by a wire DTO.
+	MaxResponseBytes    int64
 	URL                 string
 	Method              string
 	Headers             map[string]string
@@ -35,14 +38,18 @@ type Params struct {
 
 // Result is the transport-independent fetch response.
 type Result struct {
-	OK       bool
-	Status   int
-	Protocol string
-	FinalURL string
-	Headers  map[string]string
-	Trailers http.Header
-	Body     string
-	Error    string
+	OK           bool
+	Status       int
+	Protocol     string
+	FinalURL     string
+	Headers      map[string]string
+	Trailers     http.Header
+	Body         string
+	Error        string
+	HeaderValues http.Header
+	BodyBase64   string
+	ErrorCode    string
+	TimeoutPhase string
 }
 
 // ConfigError identifies request configuration failures that callers should
@@ -140,28 +147,29 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 	}
 	defer response.Client.CloseIdleConnections()
 	if requestErr != nil {
-		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: requestErr.Error()}, nil
+		code, phase := responsecontract.Code(requestErr, "request_error")
+		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: responsecontract.ErrorMessage(requestErr), ErrorCode: code, TimeoutPhase: phase}, nil
 	}
 
-	body, err := io.ReadAll(response.Body)
+	wire, decodedBody, err := responsecontract.Read(response.Body, http.Header(response.HeaderValues), params.MaxResponseBytes)
 	if err != nil {
-		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: "读取响应体失败: " + err.Error()}, nil
+		code, phase := responsecontract.Code(err, "read_error")
+		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Headers: response.Headers, HeaderValues: http.Header(response.HeaderValues).Clone(), Error: "读取响应体失败: " + err.Error(), ErrorCode: code, TimeoutPhase: phase}, nil
 	}
 
-	decodedBody := string(body)
-	if contentEncoding := response.Headers["Content-Encoding"]; contentEncoding != "" {
-		decodedBody = fastls.DecompressBody(body, []string{contentEncoding}, nil)
-	} else if contentType := response.Headers["Content-Type"]; contentType != "" {
-		decodedBody = fastls.DecompressBody(body, nil, []string{contentType})
+	bodyBase64 := ""
+	if params.IncludeBodyBase64 {
+		bodyBase64 = responsecontract.Base64(wire)
 	}
-
 	return Result{
-		OK:       true,
-		Status:   response.Status,
-		Protocol: response.Protocol,
-		FinalURL: response.FinalURL,
-		Headers:  response.Headers,
-		Trailers: response.Trailer.Clone(),
-		Body:     decodedBody,
+		OK:           true,
+		Status:       response.Status,
+		Protocol:     response.Protocol,
+		FinalURL:     response.FinalURL,
+		Headers:      response.Headers,
+		Trailers:     response.Trailer.Clone(),
+		Body:         decodedBody,
+		HeaderValues: http.Header(response.HeaderValues).Clone(),
+		BodyBase64:   bodyBase64,
 	}, nil
 }

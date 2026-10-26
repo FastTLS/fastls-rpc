@@ -112,10 +112,22 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	jsonRPCBinary := testprocess.BuildInDir(t, rpcRoot, "./jsonrpc", "fastls-jsonrpc")
 	grpcBinary := testprocess.BuildInDir(t, rpcRoot, "./grpc", "fastls-grpc")
 	mitmBinary := testprocess.BuildInDir(t, mitmRoot, ".", "fastls-mitm")
+	assertWorkspaceRequestLimits(t, fetchBinary, jsonRPCBinary, grpcBinary)
 
 	var targetRequests atomic.Int64
 	target := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		targetRequests.Add(1)
+		if r.URL.Path == "/contract" {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Add("X-Repeat", "one")
+			w.Header().Add("X-Repeat", "two")
+			w.Header().Add("Set-Cookie", "a=1; Path=/")
+			w.Header().Add("Set-Cookie", "b=2; Path=/")
+			w.Header().Set("Trailer", "X-Final")
+			w.Write([]byte{0, 255, 128, 1})
+			w.Header().Set("X-Final", "complete")
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		_, _ = io.WriteString(w, r.Proto+"|"+r.Method+"|"+string(body))
 	}))
@@ -206,6 +218,11 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	t.Run("gRPC caller cancellation reaches target", func(t *testing.T) {
 		assertGRPCServiceCancellation(t, grpcAddress, grpcProcess)
 	})
+
+	t.Run("response fidelity across direct and MITM routes", func(t *testing.T) {
+		assertWorkspaceResponseContract(t, "http://"+fetchAddress+"/fetch", "http://"+jsonRPCAddress+"/rpc", grpcAddress, target.URL+"/contract", parentProxy, fetchProcess, jsonRPCProcess)
+	})
+	t.Run("operator limits across service binaries", func(t *testing.T) { assertWorkspaceServiceLimits(t, fetchBinary, jsonRPCBinary, grpcBinary) })
 
 	testprocess.WaitForHTTPStatus(t, "http://"+fetchAddress+"/health", http.StatusOK, fetchProcess)
 	testprocess.WaitForHTTPStatus(t, "http://"+jsonRPCAddress+"/health", http.StatusOK, jsonRPCProcess)

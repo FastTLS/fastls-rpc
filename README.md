@@ -4,7 +4,9 @@
 
 FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
-> 当前状态：`v0.1.0` 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+> 当前状态：[`v0.1.0`](https://github.com/FastTLS/fastls-rpc/releases/tag/v0.1.0) 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+
+当前开发分支为JSON-RPC/gRPC增加完整多值响应头、按需附带的原始正文Base64、错误分类和可选响应字节/并发上限；另提供max-request-bytes启动参数，默认4MiB，可配置1字节至64MiB，0选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf新增请求字段15与响应字段9–12，旧字段保持不变；这些变更尚未发布。
 
 [使用文档](https://fasttls.github.io/ecosystem/) · [下载发布包](https://github.com/FastTLS/fastls-rpc/releases)
 
@@ -22,6 +24,8 @@ FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种�
 JSON-RPC 适合无需生成客户端的 HTTP 集成；gRPC 适合需要 Protobuf 类型约束和标准 gRPC 工具链的场景。
 
 ## 环境要求
+
+开发源码另增加可信`-address-policy`启动选项，见[地址策略与核心能力检查](ADDRESS_POLICY.md)。当前公开核心v0.1.1不支持它，指定后拒绝启动；只有显式开发工作区链接的新核心可启用，不能将默认构建误认为已获得访问控制。
 
 - Go 1.26 或更高版本；CI 同时覆盖 Go 1.26.10 和 1.27.3
 - 使用仓库自己的 `go.mod`，建议设置 `GOWORK=off`
