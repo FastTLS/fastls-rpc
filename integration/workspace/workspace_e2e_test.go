@@ -158,6 +158,9 @@ func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	grpcAddress := testprocess.ReserveLoopbackAddress(t)
 	grpcProcess := testprocess.Start(t, grpcBinary, "-addr", grpcAddress)
 	assertGRPCThroughMITM(t, grpcAddress, target.URL, parentProxy, grpcProcess)
+	t.Run("gRPC acknowledges each HTTP2 settings frame", func(t *testing.T) {
+		assertGRPCSettingsACKs(t, grpcAddress)
+	})
 
 	if got := targetRequests.Load(); got != 3 {
 		t.Fatalf("successful target requests = %d, want 3", got)

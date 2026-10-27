@@ -22,6 +22,8 @@ GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace
 
 测试只监听环回地址，目标、CA、二进制和进程日志都位于测试临时目录，不访问公网。
 
+gRPC 入站还使用独立原始帧客户端，把 8 个 HTTP/2 SETTINGS 连续写入同一连接，并要求逐帧返回 8 个 ACK。它检查真实 CLI，不应用基准靶场的 Go net/http overlay；Fetch、JSON-RPC 和 MITM 的入站 HTTP/1 路径不据此声称支持 HTTP/2。
+
 Windows 本地运行会跳过 POSIX 中断信号用例；协调 Action 的 Ubuntu runner 会执行该用例。Windows 上的生命周期实现仍由各仓库的 context 取消和监听器关闭测试覆盖，不把不等价的强制终止冒充优雅退出。
 
 ## GitHub Actions

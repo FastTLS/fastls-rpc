@@ -8,22 +8,25 @@ on:
       core_ref:
         description: Reviewed fastls ref containing WithAddressPolicyJSON and CheckAddressPolicy
         required: true
-        default: v2
+        default: cb551d82fe4a3bc51e848b36d22180fb9b0aa798
         type: string
       transport_ref:
         description: Reviewed ftransport ref
         required: true
-        default: main
+        default: d5afcd1a2db48a40850363b76e8a19eb339c757c
         type: string
       fetch_ref:
         description: Reviewed fastls-fetch ref containing the service policy flag
         required: true
-        default: main
         type: string
       mitm_ref:
         description: Reviewed fastls-mitm ref containing secure policy interception
         required: true
-        default: main
+        type: string
+      imitate_ref:
+        description: Reviewed imitate full commit SHA
+        required: true
+        default: fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e
         type: string
 
 permissions:
@@ -41,6 +44,22 @@ jobs:
     env:
       GOWORK: 'off'
     steps:
+      - name: Require immutable reviewed inputs
+        shell: bash
+        env:
+          CORE_REF: ${{ inputs.core_ref }}
+          TRANSPORT_REF: ${{ inputs.transport_ref }}
+          FETCH_REF: ${{ inputs.fetch_ref }}
+          MITM_REF: ${{ inputs.mitm_ref }}
+          IMITATE_REF: ${{ inputs.imitate_ref }}
+        run: |
+          set -euo pipefail
+          for name in CORE_REF TRANSPORT_REF FETCH_REF MITM_REF IMITATE_REF; do
+            if [[ ! "${!name}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              echo "$name must be a reviewed full commit SHA" >&2
+              exit 1
+            fi
+          done
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: workspace/fastls-rpc-ftransport
@@ -63,6 +82,12 @@ jobs:
           ref: ${{ inputs.fetch_ref }}
           path: workspace/fastls-fetch-ftransport
           persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: FastTLS/imitate
+          ref: ${{ inputs.imitate_ref }}
+          path: workspace/imitate
+          persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ matrix.go }}
@@ -81,11 +106,11 @@ jobs:
           mkdir -p policy-evidence
           {
             go version
-            for module in fastls ftransport fastls-fetch-ftransport fastls-rpc-ftransport fastls-mitm-ftransport; do
+            for module in fastls ftransport imitate fastls-fetch-ftransport fastls-rpc-ftransport fastls-mitm-ftransport; do
               printf '%s=%s\n' "$module" "$(git -C "$module" rev-parse HEAD)"
             done
           } | tee policy-evidence/revisions.txt
-          go work init ./fastls ./fastls/profile ./ftransport ./fastls-fetch-ftransport ./fastls-rpc-ftransport ./fastls-mitm-ftransport
+          go work init ./fastls ./fastls/profile ./ftransport ./imitate ./fastls-fetch-ftransport ./fastls-rpc-ftransport ./fastls-mitm-ftransport
       - name: Enabled policy and old-core fail-closed contracts
         working-directory: workspace/fastls-rpc-ftransport
         env:
