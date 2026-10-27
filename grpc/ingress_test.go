@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,8 +22,91 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
+
+type heldIngressCodec struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+var heldIngressDecoder atomic.Pointer[heldIngressCodec]
+
+type registeredHeldIngressCodec struct{}
+
+func init()                                     { encoding.RegisterCodec(registeredHeldIngressCodec{}) }
+func (registeredHeldIngressCodec) Name() string { return "s1-held-proto" }
+func (registeredHeldIngressCodec) Marshal(value any) ([]byte, error) {
+	return proto.Marshal(value.(proto.Message))
+}
+func (registeredHeldIngressCodec) Unmarshal(data []byte, value any) error {
+	decoder := heldIngressDecoder.Load()
+	if decoder == nil {
+		return fmt.Errorf("test decoder is not installed")
+	}
+	return decoder.Unmarshal(data, value)
+}
+
+func (*heldIngressCodec) Name() string { return "s1-held-proto" }
+func (*heldIngressCodec) Marshal(value any) ([]byte, error) {
+	return proto.Marshal(value.(proto.Message))
+}
+func (c *heldIngressCodec) Unmarshal(data []byte, value any) error {
+	c.once.Do(func() { close(c.started) })
+	<-c.release
+	return proto.Unmarshal(data, value.(proto.Message))
+}
+
+func TestIngressGRPCCancelRetainsPermitUntilDecoderStops(t *testing.T) {
+	codec := &heldIngressCodec{started: make(chan struct{}), release: make(chan struct{})}
+	heldIngressDecoder.Store(codec)
+	defer heldIngressDecoder.Store(nil)
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(codec.release) }) }
+	defer unblock()
+	address := ingressServer(t, grpcIngressConfig{Limits: ingress.Limits{MaxAdmittedRequests: 1}, MaxStreamsPerConnection: 8})
+	connection, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	client := pb.NewFastlsServiceClient(connection)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := client.Health(ctx, &pb.HealthRequest{}, grpc.CallContentSubtype(codec.Name()))
+		done <- err
+	}()
+	select {
+	case <-codec.started:
+	case <-time.After(time.Second):
+		t.Fatal("decoder did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if status.Code(err) != codes.Canceled {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("caller did not observe cancellation")
+	}
+	for i := 0; i < 10; i++ {
+		probe, cancel := context.WithTimeout(context.Background(), time.Second)
+		_, err := client.Health(probe, &pb.HealthRequest{})
+		cancel()
+		if status.Code(err) != codes.ResourceExhausted {
+			t.Fatalf("canceled but running decoder released its permit: %v", err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	unblock()
+	healthRecovers(t, clientHealth(t, address))
+}
 
 func ingressServer(t *testing.T, config grpcIngressConfig) string {
 	t.Helper()
@@ -229,7 +313,12 @@ func TestIngressGRPCRejectsBeforeMessageAndReleasesOnReset(t *testing.T) {
 		t.Fatalf("wrong malformed compressed-message status: %v", code)
 	}
 	healthRecovers(t, health)
-	peer.open(7, peerHeaders("Health"), nil)
+	peer.open(7, peerHeaders("Unknown"), nil)
+	if code, _ := peer.result(7); code != codes.Unimplemented {
+		t.Fatalf("unknown method did not terminate: %v", code)
+	}
+	healthRecovers(t, health)
+	peer.open(9, peerHeaders("Health"), nil)
 	peer.barrier()
 	peer.conn.Close()
 	healthRecovers(t, health)

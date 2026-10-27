@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
+	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
 	"github.com/FastTLS/fastls-rpc/internal/ingress"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -68,7 +70,7 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 			}
 			return response, err
 		}), grpc.StatsHandler(admissionStats{}))
-		options = append(options, grpc.InTapHandle(func(ctx context.Context, _ *tap.Info) (context.Context, error) {
+		options = append(options, grpc.InTapHandle(func(ctx context.Context, info *tap.Info) (context.Context, error) {
 			original := ctx
 			release, err := gate.Acquire(ctx)
 			if err != nil {
@@ -81,9 +83,24 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 			if config.RPCTimeout > 0 {
 				ctx, cancel = context.WithTimeout(ctx, config.RPCTimeout)
 			}
-			// The unary interceptor releases before emitting the response. End and
-			// transport cancellation cover read/decode errors and unknown methods.
-			context.AfterFunc(original, func() { cancel(); release() })
+			// A reset can cancel the transport context while a decoder is still
+			// running. Known unary methods must retain their permit until their
+			// interceptor or stats.End runs, rather than release on cancellation.
+			knownUnary := false
+			method := strings.TrimPrefix(info.FullMethodName, "/")
+			for _, descriptor := range pb.FastlsService_ServiceDesc.Methods {
+				if method == pb.FastlsService_ServiceDesc.ServiceName+"/"+descriptor.MethodName {
+					knownUnary = true
+					break
+				}
+			}
+			context.AfterFunc(original, func() {
+				cancel()
+				// Unknown methods never reach a unary handler or stats.End.
+				if !knownUnary {
+					release()
+				}
+			})
 			return context.WithValue(ctx, admissionLeaseKey{}, release), nil
 		}))
 	}
