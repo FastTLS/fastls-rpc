@@ -100,6 +100,7 @@ func TestWorkspaceUnifiedResponseContract(t *testing.T) {
 					cancelStarted <- struct{}{}
 					<-r.Context().Done()
 					cancelEnded <- struct{}{}
+					panic(http.ErrAbortHandler)
 				case "/redirect":
 					http.Redirect(w, r, "/binary", 302)
 				case "/gzip":
@@ -117,10 +118,13 @@ func TestWorkspaceUnifiedResponseContract(t *testing.T) {
 					panic(http.ErrAbortHandler)
 				case "/headers-hold":
 					<-r.Context().Done()
+					panic(http.ErrAbortHandler)
 				case "/body-hold":
 					w.Write([]byte("prefix"))
 					w.(http.Flusher).Flush()
 					<-r.Context().Done()
+					// Never emit a successful final chunk after cancellation.
+					panic(http.ErrAbortHandler)
 				default:
 					w.Header().Add("X-Repeat", "one")
 					w.Header().Add("X-Repeat", "two")

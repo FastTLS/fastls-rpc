@@ -79,6 +79,7 @@ func TestWorkspaceAuditBinaries(t *testing.T) {
 					started <- struct{}{}
 					<-r.Context().Done()
 					cancelled <- struct{}{}
+					panic(http.ErrAbortHandler)
 				case "/broken":
 					w.Header().Set("Content-Encoding", "gzip")
 					w.Write([]byte("bad"))
