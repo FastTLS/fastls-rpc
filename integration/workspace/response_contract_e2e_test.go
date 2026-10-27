@@ -29,8 +29,10 @@ type contractResponse struct {
 	HeaderValues http.Header `json:"header_values"`
 	Trailers     http.Header `json:"trailers"`
 	BodyBase64   string      `json:"body_base64"`
+	Body         string      `json:"body"`
 	Error        string      `json:"error"`
 	ErrorCode    string      `json:"error_code"`
+	TimeoutPhase string      `json:"timeout_phase"`
 }
 
 func assertWorkspaceServiceLimits(t *testing.T, fetchBinary, rpcBinary, grpcBinary string) {

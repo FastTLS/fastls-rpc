@@ -63,7 +63,7 @@ jobs:
   four-process-contract:
     name: Fetch, JSON-RPC and gRPC through MITM
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out fastls-rpc
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6

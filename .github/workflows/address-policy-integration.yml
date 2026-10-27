@@ -144,6 +144,23 @@ jobs:
         run: |
           set -euo pipefail
           go test -count=3 -tags policy_e2e -timeout 180s ./integration/policy 2>&1 | tee ../policy-evidence/policy.log
+      - name: Unified default response contract with published dependencies
+        working-directory: workspace/fastls-rpc-ftransport
+        env:
+          GOWORK: 'off'
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -tags workspace_e2e -run '^TestWorkspaceUnifiedResponseContract$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/response-public.log
+      - name: Unified default response contract with reviewed development dependencies
+        working-directory: workspace/fastls-rpc-ftransport
+        env:
+          GOWORK: ${{ github.workspace }}/workspace/go.work
+          FASTLS_CONTRACT_GOWORK: ${{ github.workspace }}/workspace/go.work
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -tags workspace_e2e -run '^TestWorkspaceUnifiedResponseContract$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/response-development.log
       - name: Configured request budgets in Fetch and RPC
         env:
           GOWORK: ${{ github.workspace }}/workspace/go.work
