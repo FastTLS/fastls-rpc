@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FastTLS/fastls-rpc/internal/audit"
 	"io"
 	"log"
 	"net"
@@ -111,6 +112,7 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 	var req JSONRPCRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.Result(c.Request.Context(), "", 0, "invalid_request", "")
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			c.JSON(http.StatusRequestEntityTooLarge, JSONRPCResponse{
@@ -138,6 +140,7 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 
 	// 验证JSON-RPC版本
 	if req.JSONRPC != "2.0" {
+		audit.Result(c.Request.Context(), "", 0, "invalid_request", "")
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &RPCError{
@@ -174,6 +177,11 @@ func (s *RPCServer) handleRPC(c *gin.Context) {
 	}
 
 	if rpcErr != nil {
+		code := "invalid_request"
+		if rpcErr.Code == -32601 {
+			code = "not_found"
+		}
+		audit.Result(c.Request.Context(), "", 0, code, "")
 		response.Error = rpcErr
 	} else {
 		response.Result = result
@@ -226,6 +234,7 @@ func main() {
 		requestMaximum int64
 		inflight       int
 		policyFile     string
+		auditConfig    audit.Config
 		ingressConfig  ingress.HTTPConfig
 	)
 
@@ -237,6 +246,7 @@ func main() {
 	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 	ingressConfig.BindFlags(flag.CommandLine)
+	auditConfig.BindFlags(flag.CommandLine)
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -264,50 +274,59 @@ func main() {
 	}
 
 	// 设置最大CPU核心数
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	if err := audit.Run(auditConfig, func(sink *audit.Sink) error {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// 创建RPC服务器
-	rpcServer, err := NewRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile})
-	if err != nil {
-		log.Fatal(err)
-	}
+		// 创建RPC服务器
+		rpcServer, err := NewRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile})
+		if err != nil {
+			return err
+		}
 
-	// 创建gin路由
-	if debug {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
-	}
-	r := newJSONRPCRouter(rpcServer)
-	ingressConfig.OverloadHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: -32000, Message: "Inbound request limit reached", Data: "overloaded"}})
-	})
-	server, err := ingress.NewHTTPServer(r, ingressConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+		// 创建gin路由
+		if debug {
+			gin.SetMode(gin.DebugMode)
+		} else {
+			gin.SetMode(gin.ReleaseMode)
+		}
+		r := newJSONRPCRouter(rpcServer)
+		ingressConfig.OverloadHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: -32000, Message: "Inbound request limit reached", Data: "overloaded"}})
+		})
+		server, err := ingress.NewHTTPServer(r, ingressConfig)
+		if err != nil {
+			return err
+		}
 
-	// 启动服务器
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("监听端口失败: %v", err)
-	}
-	limited, err := ingress.NewListener(listener, ingressConfig.MaxConnections)
-	if err != nil {
-		listener.Close()
+		server.Handler = sink.HTTP("jsonrpc", server.Handler)
+		// 启动服务器
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("监听端口失败: %w", err)
+		}
+		limited, err := ingress.NewListener(listener, ingressConfig.MaxConnections)
+		if err != nil {
+			listener.Close()
+			return err
+		}
+		if sink != nil {
+			limited.OnReject = func() { sink.Reject("jsonrpc") }
+		}
+		shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stopSignals()
+		log.Printf("RPC服务启动在端口 %s", listener.Addr())
+		log.Printf("RPC端点: http://%s/rpc", listener.Addr())
+		if err := serverlifecycle.ServeHTTP(shutdownContext, limited, server); err != nil {
+			return fmt.Errorf("服务器启动失败: %w", err)
+		}
+		if shutdownContext.Err() != nil {
+			log.Printf("RPC服务已安全停止")
+		}
+		return nil
+	}); err != nil {
 		log.Fatal(err)
-	}
-	shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stopSignals()
-	log.Printf("RPC服务启动在端口 %s", listener.Addr())
-	log.Printf("RPC端点: http://%s/rpc", listener.Addr())
-	if err := serverlifecycle.ServeHTTP(shutdownContext, limited, server); err != nil {
-		log.Fatalf("服务器启动失败: %v", err)
-	}
-	if shutdownContext.Err() != nil {
-		log.Printf("RPC服务已安全停止")
 	}
 }
 
@@ -336,6 +355,7 @@ func rpcRequestBodyLimit(limit int64) gin.HandlerFunc {
 					message = "Invalid Request"
 					detail = fmt.Sprintf("request body exceeds %d byte limit", tooLarge.Limit)
 				}
+				audit.Result(c.Request.Context(), "", 0, map[bool]string{true: "request_too_large", false: "invalid_request"}[status == 413], "")
 				c.AbortWithStatusJSON(status, JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: code, Message: message, Data: detail}})
 				return
 			}

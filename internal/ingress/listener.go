@@ -10,6 +10,7 @@ import (
 // Close stops admission; existing connections retain their leases until closed.
 type Listener struct {
 	net.Listener
+	OnReject    func()
 	mu          sync.Mutex
 	maximum     int
 	closed      bool
@@ -41,6 +42,9 @@ func (l *Listener) Accept() (net.Conn, error) {
 		if l.maximum > 0 && len(l.connections) >= l.maximum {
 			l.mu.Unlock()
 			_ = conn.Close()
+			if l.OnReject != nil {
+				l.OnReject()
+			}
 			continue
 		}
 		leased := &leasedConn{Conn: conn, owner: l}

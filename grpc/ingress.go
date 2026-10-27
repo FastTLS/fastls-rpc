@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/FastTLS/fastls-rpc/internal/audit"
 	"strings"
 	"time"
 
@@ -61,22 +62,31 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 	if config.ConnectionTimeout > 0 {
 		options = append(options, grpc.ConnectionTimeout(config.ConnectionTimeout))
 	}
-	if config.MaxAdmittedRequests > 0 || config.RPCTimeout > 0 {
-		options = append(options, grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-			defer releaseAdmission(ctx)
-			response, err := handler(ctx, request)
-			if ctx.Err() != nil {
-				return nil, status.FromContextError(ctx.Err()).Err()
-			}
-			return response, err
-		}), grpc.StatsHandler(admissionStats{}))
+	admissionEnabled := config.MaxAdmittedRequests > 0 || config.RPCTimeout > 0
+	if admissionEnabled || s.audit != nil {
+		if admissionEnabled {
+			options = append(options, grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+				defer releaseAdmission(ctx)
+				response, err := handler(ctx, request)
+				if ctx.Err() != nil {
+					return nil, status.FromContextError(ctx.Err()).Err()
+				}
+				return response, err
+			}), grpc.StatsHandler(admissionStats{}))
+		}
 		options = append(options, grpc.InTapHandle(func(ctx context.Context, info *tap.Info) (context.Context, error) {
+			ctx, operation := (auditRPCStats{sink: s.audit}).begin(ctx, info.FullMethodName)
 			original := ctx
 			release, err := gate.Acquire(ctx)
 			if err != nil {
+				stopAuditFallback(ctx)
 				if ctx.Err() != nil {
+					operation.Done(ctx, 0, status.Code(status.FromContextError(ctx.Err()).Err()).String())
 					return ctx, status.FromContextError(ctx.Err()).Err()
 				}
+				audit.Result(ctx, "", 0, "overloaded", "")
+				audit.RPCStatus(ctx, "ResourceExhausted")
+				operation.Done(ctx, 0, "ResourceExhausted")
 				return ctx, status.Error(codes.ResourceExhausted, "inbound request limit reached")
 			}
 			cancel := func() {}

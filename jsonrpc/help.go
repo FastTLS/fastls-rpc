@@ -3,6 +3,8 @@ package main
 import "fmt"
 
 func printHelp() {
+	fmt.Println("Audit (development): -audit-file PATH -audit-queue 1024 -audit-drain-timeout 5s; disabled without a file")
+
 	fmt.Printf("Fastls JSON-RPC Service - JSON-RPC 请求服务\n\n")
 	fmt.Printf("用法:\n")
 	fmt.Printf("  fastls-jsonrpc [选项]\n\n")

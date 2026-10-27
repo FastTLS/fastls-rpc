@@ -161,6 +161,22 @@ jobs:
         run: |
           set -euo pipefail
           go test -count=1 -tags workspace_e2e -run '^TestWorkspaceUnifiedResponseContract$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/response-development.log
+      - name: Audit CLI contracts with published and reviewed dependencies
+        working-directory: workspace/fastls-rpc-ftransport
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOWORK=off go test -count=3 -tags workspace_e2e -run '^TestWorkspaceAuditBinaries$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/audit-public.log
+          GOWORK="${{ github.workspace }}/workspace/go.work" FASTLS_CONTRACT_GOWORK="${{ github.workspace }}/workspace/go.work" go test -count=3 -tags workspace_e2e -run '^TestWorkspaceAuditBinaries$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/audit-development.log
+      - name: Audited response fidelity with published and reviewed dependencies
+        working-directory: workspace/fastls-rpc-ftransport
+        shell: bash
+        env:
+          FASTLS_CONTRACT_AUDIT: '1'
+        run: |
+          set -euo pipefail
+          GOWORK=off go test -count=1 -tags workspace_e2e -run '^TestWorkspaceUnifiedResponseContract$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/audited-response-public.log
+          GOWORK="${{ github.workspace }}/workspace/go.work" FASTLS_CONTRACT_GOWORK="${{ github.workspace }}/workspace/go.work" go test -count=1 -tags workspace_e2e -run '^TestWorkspaceUnifiedResponseContract$' -timeout 180s ./integration/workspace 2>&1 | tee ../policy-evidence/audited-response-development.log
       - name: Configured request budgets in Fetch and RPC
         env:
           GOWORK: ${{ github.workspace }}/workspace/go.work

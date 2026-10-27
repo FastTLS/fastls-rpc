@@ -3,6 +3,7 @@ package fetchservice
 import (
 	"context"
 	fastls "github.com/FastTLS/fastls"
+	"github.com/FastTLS/fastls-rpc/internal/audit"
 	"github.com/FastTLS/fastls-rpc/internal/responsecontract"
 	"github.com/FastTLS/fastls-rpc/internal/servicepolicy"
 )
@@ -38,7 +39,14 @@ func NewExecutorWithConfig(config Config) (*Executor, error) {
 
 func (e *Executor) RequestMaximum() int64 { return e.guard.RequestMaximum() }
 
-func (e *Executor) Fetch(ctx context.Context, params Params) (Result, error) {
+func (e *Executor) Fetch(ctx context.Context, params Params) (result Result, failure error) {
+	defer func() {
+		code, phase := result.ErrorCode, result.TimeoutPhase
+		if failure != nil {
+			code = "invalid_request"
+		}
+		audit.Result(ctx, result.Protocol, result.Status, code, phase)
+	}()
 	release, err := e.guard.Acquire(ctx)
 	if err != nil {
 		code, phase := responsecontract.Code(err, "overloaded")

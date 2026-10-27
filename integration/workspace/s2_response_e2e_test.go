@@ -64,6 +64,9 @@ func TestWorkspaceUnifiedResponseContract(t *testing.T) {
 		address := testprocess.ReserveLoopbackAddress(t)
 		addresses[kind] = address
 		args := []string{"-addr", address}
+		if os.Getenv("FASTLS_CONTRACT_AUDIT") == "1" {
+			args = append(args, "-audit-file", filepath.Join(t.TempDir(), kind+".jsonl"))
+		}
 		if kind == "mitm" {
 			dir := t.TempDir()
 			mitmCA = filepath.Join(dir, "ca.pem")
