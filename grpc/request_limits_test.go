@@ -73,6 +73,10 @@ func TestRequestBudgetExactOversizeCompressedAndRaisedDefault(t *testing.T) {
 						if proto.Size(request) != maximum+1 || status.Code(err) != codes.ResourceExhausted || calls.Load() != before {
 							t.Fatalf("oversized/compressed=%v reached target or wrong error: %v", compressed, err)
 						}
+						// The peer can receive trailers before stats.End releases
+						// the decoder's admission lease. Observe recovery through
+						// Health before issuing the next exact-size business call.
+						healthRecovers(t, clientHealth(t, listener.Addr().String()))
 					} else if err != nil || !result.Ok || result.Body != "ok" {
 						t.Fatalf("exact size rejected: %v %v", result, err)
 					}
