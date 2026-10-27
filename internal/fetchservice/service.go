@@ -141,6 +141,8 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 		method = "GET"
 	}
 
+	ctx, cancel := responsecontract.RequestContext(ctx, options.Timeout)
+	defer cancel()
 	response, requestErr := client.DoContext(ctx, params.URL, options, method)
 	if response.Body != nil {
 		defer response.Body.Close()
@@ -151,7 +153,7 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: responsecontract.ErrorMessage(requestErr), ErrorCode: code, TimeoutPhase: phase}, nil
 	}
 
-	wire, decodedBody, err := responsecontract.Read(response.Body, http.Header(response.HeaderValues), params.MaxResponseBytes)
+	wire, decodedBody, err := responsecontract.ReadContext(ctx, response.Body, http.Header(response.HeaderValues), params.MaxResponseBytes)
 	if err != nil {
 		code, phase := responsecontract.Code(err, "read_error")
 		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Headers: response.Headers, HeaderValues: http.Header(response.HeaderValues).Clone(), Error: "读取响应体失败: " + err.Error(), ErrorCode: code, TimeoutPhase: phase}, nil

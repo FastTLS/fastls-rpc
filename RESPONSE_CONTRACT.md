@@ -31,6 +31,8 @@ gRPC按完整protobuf消息计费（含字段封装），同时限制压缩消�
 
 `request_error`表示未取得可用响应，`read_error`表示正文传输读取失败，`decode_error`表示内容编码无效，`response_too_large`表示正文超限，`overloaded`表示并发名额耗尽，`cancelled`表示取消，`timeout`同时附带`timeout_phase`（当前一次性服务请求主要为`total`）。可用的核心阶段错误也保留原阶段名。
 
+服务持有贯穿上游请求、正文读取和解码的总时限。在返回成功前再次核验取消与到期，EOF 与超时/取消竞争时不能把部分正文报告为成功。请求的 timeout=0 仍使用 30 秒默认值，调用方更早的 deadline 继续有效。
+
 Fetch在并发超限时使用HTTP503；JSON-RPC和gRPC沿用已有fetch结果封装，返回`ok=false`及相同`error_code`。输入校验、框架消息上限等协议层错误继续使用原协议错误通道。
 
 ## 当前边界
