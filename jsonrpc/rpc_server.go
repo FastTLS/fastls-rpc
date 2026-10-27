@@ -15,10 +15,10 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 
 	fastls "github.com/FastTLS/fastls"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
+	"github.com/FastTLS/fastls-rpc/internal/ingress"
 	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"github.com/gin-gonic/gin"
 )
@@ -226,6 +226,7 @@ func main() {
 		requestMaximum int64
 		inflight       int
 		policyFile     string
+		ingressConfig  ingress.HTTPConfig
 	)
 
 	// 定义完整参数和缩写参数
@@ -235,6 +236,7 @@ func main() {
 	flag.Int64Var(&requestMaximum, "max-request-bytes", 4<<20, "Maximum complete JSON request bytes (1..64 MiB); 0 selects 4 MiB")
 	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
+	ingressConfig.BindFlags(flag.CommandLine)
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -277,18 +279,31 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := newJSONRPCRouter(rpcServer)
+	ingressConfig.OverloadHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: -32000, Message: "Inbound request limit reached", Data: "overloaded"}})
+	})
+	server, err := ingress.NewHTTPServer(r, ingressConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// 启动服务器
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("监听端口失败: %v", err)
 	}
+	limited, err := ingress.NewListener(listener, ingressConfig.MaxConnections)
+	if err != nil {
+		listener.Close()
+		log.Fatal(err)
+	}
 	shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
-	server := &http.Server{Handler: r, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("RPC服务启动在端口 %s", listener.Addr())
 	log.Printf("RPC端点: http://%s/rpc", listener.Addr())
-	if err := serverlifecycle.ServeHTTP(shutdownContext, listener, server); err != nil {
+	if err := serverlifecycle.ServeHTTP(shutdownContext, limited, server); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
 	if shutdownContext.Err() != nil {

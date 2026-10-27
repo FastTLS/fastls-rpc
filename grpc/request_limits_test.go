@@ -14,6 +14,7 @@ import (
 
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
+	"github.com/FastTLS/fastls-rpc/internal/ingress"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -42,7 +43,10 @@ func TestRequestBudgetExactOversizeCompressedAndRaisedDefault(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			server := service.newTransportServer()
+			server, err := service.newTransportServerWithIngress(grpcIngressConfig{Limits: ingress.Limits{MaxAdmittedRequests: 1}, MaxStreamsPerConnection: 2})
+			if err != nil {
+				t.Fatal(err)
+			}
 			defer server.Stop()
 			go server.Serve(listener)
 			connection, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))

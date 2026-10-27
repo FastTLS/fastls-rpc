@@ -15,9 +15,11 @@ import (
 	fastls "github.com/FastTLS/fastls"
 	pb "github.com/FastTLS/fastls-rpc/grpc/proto"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
+	"github.com/FastTLS/fastls-rpc/internal/ingress"
 	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/status"
 )
 
@@ -47,7 +49,12 @@ func NewGRPCServerWithConfig(config fetchservice.Config) (*GRPCServer, error) {
 
 // newTransportServer applies the same validated startup budget to the wire server.
 func (s *GRPCServer) newTransportServer() *grpc.Server {
-	server := grpc.NewServer(grpc.MaxRecvMsgSize(int(s.executor.RequestMaximum())))
+	return s.transportServer()
+}
+
+func (s *GRPCServer) transportServer(options ...grpc.ServerOption) *grpc.Server {
+	options = append(options, grpc.MaxRecvMsgSize(int(s.executor.RequestMaximum())))
+	server := grpc.NewServer(options...)
 	pb.RegisterFastlsServiceServer(server, s)
 	return server
 }
@@ -136,6 +143,7 @@ func main() {
 		requestMaximum int64
 		inflight       int
 		policyFile     string
+		ingressConfig  grpcIngressConfig
 	)
 
 	// 定义完整参数和缩写参数
@@ -145,6 +153,7 @@ func main() {
 	flag.Int64Var(&requestMaximum, "max-request-bytes", 4<<20, "Maximum decompressed protobuf request bytes (1..64 MiB); 0 selects 4 MiB")
 	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
+	ingressConfig.bindFlags(flag.CommandLine)
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -181,12 +190,20 @@ func main() {
 	}
 
 	// 创建gRPC服务
-	s := grpcServer.newTransportServer()
+	s, err := grpcServer.newTransportServerWithIngress(ingressConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// 监听端口
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("监听端口失败: %v", err)
+	}
+	limited, err := ingress.NewListener(lis, ingressConfig.MaxConnections)
+	if err != nil {
+		lis.Close()
+		log.Fatal(err)
 	}
 
 	log.Printf("gRPC服务启动在端口 %s", addr)
@@ -195,7 +212,7 @@ func main() {
 	// 启动服务器
 	shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
-	if err := serverlifecycle.ServeGRPC(shutdownContext, lis, s); err != nil {
+	if err := serverlifecycle.ServeGRPC(shutdownContext, limited, s); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
 	if shutdownContext.Err() != nil {

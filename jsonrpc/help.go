@@ -7,6 +7,7 @@ func printHelp() {
 	fmt.Printf("用法:\n")
 	fmt.Printf("  fastls-jsonrpc [选项]\n\n")
 	fmt.Printf("选项:\n")
+	fmt.Print("\n接入资源选项（可信启动配置）：\n  -max-connections int\n        已接入TCP总名额；0不限制，最大65536，含健康检查和空闲连接\n  -max-admitted-requests int\n        读取/解码正文之前的请求名额；0不限制，最大65536，含健康检查\n  -max-header-bytes int\n        入站头部预算；0保持协议库默认，最大16MiB\n  -read-header-timeout duration\n        HTTP读头时限；默认10s，0选择默认值，最大24h\n  -read-timeout duration\n        每请求头部和正文读取总时限；默认0禁用，最大24h\n  -idle-timeout duration\n        HTTP keepalive空闲时限；0采用net/http回退规则，最大24h\n")
 	fmt.Printf("  -max-request-bytes int64\n        完整JSON-RPC正文上限；默认4MiB，最大64MiB，0选择默认值\n")
 	fmt.Printf("  -address-policy string\n        可信地址策略JSON文件；核心不支持时拒绝启动（默认禁用）\n")
 	fmt.Printf("  -max-response-bytes int64\n        原始正文及各层解码字节上限；0不限制（默认0）\n")
