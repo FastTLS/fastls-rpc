@@ -13,3 +13,5 @@ GOWORK=/absolute/path/to/go.work go test -count=3 -tags policy_e2e -timeout 300s
 MITM 仓库另外运行 `-tags mitm_policy_e2e ./...` 和对应竞态检查。公开模块清单不加入 `replace`，不升级依赖版本来隐藏两种构建的区别。
 
 手动工作流 `address-policy-integration.yml` 要求五个外部仓库输入均为完整 40 位提交 SHA；Fetch/MITM 不提供可能缺少能力的 main 默认值。RPC 自身使用启动工作流选定的 ref，并将实际 SHA 与全部测试日志一并保存。工作流只运行测试，不创建 Release。远端三平台、双 Go 矩阵须单独通过，Windows 本机记录不构成该矩阵认证。
+
+新工作流尚未进入默认分支时，GitHub 不登记其手动入口。此时从已有 `Workspace integration` 工作流选择候选 RPC 分支，填写 Fetch/MITM 完整 SHA，并开启 `development_policy`；它将复用本候选中的策略工作流，以固定的新核心/传输/imitate 输入同时执行公开依赖联调与开发策略六组矩阵。默认关闭此选项，原有自动门禁保持公开依赖范围。

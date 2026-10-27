@@ -3,6 +3,23 @@ name: Development address policy integration
 # Kept separate from public-dependency gates. Reviewed development refs are
 # explicit; no release, tag, dependency rewrite, or remote branch mutation.
 on:
+  workflow_call:
+    inputs:
+      core_ref:
+        required: true
+        type: string
+      transport_ref:
+        required: true
+        type: string
+      fetch_ref:
+        required: true
+        type: string
+      mitm_ref:
+        required: true
+        type: string
+      imitate_ref:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       core_ref:

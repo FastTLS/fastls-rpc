@@ -22,6 +22,11 @@ on:
       - 'integration/workspace/**'
   workflow_dispatch:
     inputs:
+      development_policy:
+        description: Also verify the reviewed development core policy matrix (Fetch/MITM inputs must be full commit SHAs)
+        required: false
+        default: false
+        type: boolean
       fetch_ref:
         description: fastls-fetch branch, tag or commit
         required: true
@@ -46,6 +51,15 @@ env:
   MITM_REF: ${{ inputs.mitm_ref || 'main' }}
 
 jobs:
+  development-policy:
+    if: github.event_name == 'workflow_dispatch' && inputs.development_policy
+    uses: ./.github/workflows/address-policy-integration.yml
+    with:
+      core_ref: cb551d82fe4a3bc51e848b36d22180fb9b0aa798
+      transport_ref: d5afcd1a2db48a40850363b76e8a19eb339c757c
+      imitate_ref: fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e
+      fetch_ref: ${{ inputs.fetch_ref }}
+      mitm_ref: ${{ inputs.mitm_ref }}
   four-process-contract:
     name: Fetch, JSON-RPC and gRPC through MITM
     runs-on: ubuntu-24.04
