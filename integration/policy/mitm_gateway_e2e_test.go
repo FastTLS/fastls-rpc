@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -18,10 +17,7 @@ import (
 
 func TestMITMGatewayEnforcesPolicyForThreeRequestServices(t *testing.T) {
 	rpc, root := directories(t)
-	workspace := os.Getenv("GOWORK")
-	if !filepath.IsAbs(workspace) {
-		t.Fatal("gateway policy test requires an explicit source workspace")
-	}
+	workspace := policyGraph(t)
 	var connections atomic.Int32
 	target := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "gateway-ok") }))
 	target.EnableHTTP2 = true

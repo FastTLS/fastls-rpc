@@ -1,6 +1,14 @@
 # 显式新核心策略联调
 
-本组通过真实 Fetch、JSON-RPC、gRPC 与 MITM 进程验证允许/拒绝、跳转重检、代理拒绝、配额归还和受限 MITM 网关。它还单独以 `GOWORK=off` 构建旧核心服务，验证显式启用策略时在监听前失败。公开依赖下通过不能代替策略已生效的验证。
+本组通过真实 Fetch、JSON-RPC、gRPC 与 MITM 进程验证允许/拒绝、跳转重检、代理拒绝、配额归还和受限 MITM 网关。正式图使用 core v0.1.2、ftransport/imitate v0.1.1、profile v0.1.0；显式选择后逐个验证服务实际选中的版本和没有替换。另以临时独立 modfile 固定旧 core v0.1.1、ftransport/imitate v0.1.0，验证不支持策略时仍在监听前失败，不更改生产 go.mod/go.sum。不能把新公开版本误判为旧的不支持基线。
+
+验证正式图时，在 RPC 仓库执行：
+
+```sh
+GOWORK=off FASTLS_POLICY_GRAPH=formal go test -v -count=3 -tags policy_e2e -timeout 480s ./integration/policy
+```
+
+显式模式或选中的版本不符合要求即失败，不静默退回本地 workspace。`Workspace integration` 在正式图模式收集全部策略日志后再上传证据；开发模式继续使用下面的固定源码工作区。
 
 本机已验证的新核心输入为 Fastls `cb551d82fe4a3bc51e848b36d22180fb9b0aa798`、ftransport `d5afcd1a2db48a40850363b76e8a19eb339c757c` 与 imitate `fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e`。服务输入使用本次整合分支，并记录实际完整 SHA，不使用历史开发报告替代。
 

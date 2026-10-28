@@ -121,6 +121,16 @@ jobs:
           set -euo pipefail
           go test -count=3 -tags workspace_e2e ./integration/workspace 2>&1 \
             | tee ../../workspace-evidence/workspace-e2e.log
+      - name: Verify policy on the explicit formal module graph
+        if: ${{ !inputs.development_policy }}
+        working-directory: workspace/fastls-rpc-ftransport
+        env:
+          FASTLS_POLICY_GRAPH: formal
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -v -count=3 -tags policy_e2e -timeout 480s ./integration/policy 2>&1 \
+            | tee ../../workspace-evidence/formal-policy-e2e.log
       - name: Upload workspace evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

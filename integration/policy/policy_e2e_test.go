@@ -44,7 +44,7 @@ func directories(t *testing.T) (string, string) {
 	return rpc, filepath.Dir(rpc)
 }
 
-func build(t *testing.T, directory, pkg, name, workspace string) string {
+func build(t *testing.T, directory, pkg, name, workspace string, modfile ...string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -52,13 +52,92 @@ func build(t *testing.T, directory, pkg, name, workspace string) string {
 	output := filepath.Join(t.TempDir(), name)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, pkg)
+	args := []string{"build", "-trimpath", "-o", output}
+	if len(modfile) > 0 {
+		args = append(args, "-modfile", modfile[0])
+	}
+	command := exec.CommandContext(ctx, "go", append(args, pkg)...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "GOWORK="+workspace)
 	if data, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, data)
 	}
 	return output
+}
+
+func policyGraph(t *testing.T) string {
+	t.Helper()
+	workspace := os.Getenv("GOWORK")
+	if os.Getenv("FASTLS_POLICY_GRAPH") != "formal" {
+		if workspace == "off" || !filepath.IsAbs(workspace) {
+			t.Fatal("policy_e2e requires an explicit source workspace or FASTLS_POLICY_GRAPH=formal with GOWORK=off")
+		}
+		return workspace
+	}
+	if workspace != "off" {
+		t.Fatal("formal policy tests require GOWORK=off")
+	}
+	rpc, root := directories(t)
+	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.2", "github.com/FastTLS/ftransport": "v0.1.1",
+		"github.com/FastTLS/imitate": "v0.1.1", "github.com/FastTLS/fastls/profile": "v0.1.0"}
+	for _, directory := range []string{rpc, filepath.Join(root, "fastls-fetch-ftransport"), filepath.Join(root, "fastls-mitm-ftransport")} {
+		args := []string{"list", "-m", "-json", "github.com/FastTLS/fastls", "github.com/FastTLS/ftransport", "github.com/FastTLS/imitate", "github.com/FastTLS/fastls/profile"}
+		command := exec.Command("go", args...)
+		command.Dir = directory
+		command.Env = append(os.Environ(), "GOWORK=off")
+		data, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("formal module selection: %v\n%s", err, data)
+		}
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		seen := map[string]bool{}
+		for {
+			var module struct {
+				Path, Version string
+				Replace       json.RawMessage
+			}
+			if err := decoder.Decode(&module); err == io.EOF {
+				break
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if module.Version != expected[module.Path] || len(module.Replace) != 0 || seen[module.Path] {
+				t.Fatalf("unexpected formal module selection: %+v", module)
+			}
+			seen[module.Path] = true
+		}
+		if len(seen) != len(expected) {
+			t.Fatal("formal graph has missing modules")
+		}
+		t.Logf("formal policy graph verified: %s", directory)
+	}
+	return "off"
+}
+
+func legacyPolicyModfile(t *testing.T, directory string) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "legacy.mod")
+	for _, pair := range [][2]string{{"go.mod", file}, {"go.sum", strings.TrimSuffix(file, ".mod") + ".sum"}} {
+		data, err := os.ReadFile(filepath.Join(directory, pair[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(pair[1], data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{
+		{"mod", "edit", "-modfile", file, "-require=github.com/FastTLS/fastls@v0.1.1", "-require=github.com/FastTLS/ftransport@v0.1.0", "-require=github.com/FastTLS/imitate@v0.1.0"},
+		{"mod", "tidy", "-modfile", file},
+	} {
+		command := exec.Command("go", args...)
+		command.Dir = directory
+		command.Env = append(os.Environ(), "GOWORK=off")
+		if data, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("legacy module fixture: %v\n%s", err, data)
+		}
+	}
+	return file
 }
 
 func policyFile(t *testing.T, config any) string {
@@ -195,10 +274,7 @@ func start(t *testing.T, kind, binary string, config any) (func(map[string]any) 
 }
 
 func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
-	workspace := os.Getenv("GOWORK")
-	if workspace == "" || workspace == "off" || !filepath.IsAbs(workspace) {
-		t.Fatal("policy_e2e requires an explicit absolute GOWORK; it must not silently use released dependencies")
-	}
+	workspace := policyGraph(t)
 	if _, ok := any(fastls.NewClient()).(interface {
 		WithAddressPolicyJSON([]byte) (fastls.Fastls, error)
 	}); !ok {
@@ -315,13 +391,13 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 	}
 }
 
-func TestReleasedCoreRefusesRequestedPolicy(t *testing.T) {
+func TestLegacyCoreRefusesRequestedPolicy(t *testing.T) {
 	rpc, root := directories(t)
 	for _, entry := range []struct{ kind, dir, pkg string }{{"fetch", filepath.Join(root, "fastls-fetch-ftransport"), "."}, {"jsonrpc", rpc, "./jsonrpc"}, {"grpc", rpc, "./grpc"}} {
 		t.Run(entry.kind, func(t *testing.T) {
-			// Explicitly compile with the still-pinned v0.1.1 baseline. Keep this
-			// test synchronized when the public dependency is intentionally upgraded.
-			binary := build(t, entry.dir, entry.pkg, entry.kind, "off")
+			// Preserve the old unsupported-core refusal independently of the
+			// production graph, which now supports policy at fastls v0.1.2.
+			binary := build(t, entry.dir, entry.pkg, entry.kind, "off", legacyPolicyModfile(t, entry.dir))
 			failedStartup(t, binary, policyFile(t, map[string]any{}), "policy-capable fastls core")
 		})
 	}
