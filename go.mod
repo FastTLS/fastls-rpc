@@ -3,8 +3,8 @@ module github.com/FastTLS/fastls-rpc
 go 1.26.0
 
 require (
-	github.com/FastTLS/fastls v0.1.1
-	github.com/FastTLS/imitate v0.1.0
+	github.com/FastTLS/fastls v0.1.2
+	github.com/FastTLS/imitate v0.1.1
 	github.com/andybalholm/brotli v1.2.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/klauspost/compress v1.18.7
@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/FastTLS/fastls/profile v0.1.0 // indirect
-	github.com/FastTLS/ftransport v0.1.0 // indirect
+	github.com/FastTLS/ftransport v0.1.1 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
