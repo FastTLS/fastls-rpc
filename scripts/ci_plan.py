@@ -4,9 +4,65 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import hashlib
+import re
+import urllib.request
 
 CURRENT = '1.26.10'
 NEXT = '1.27.3'
+
+
+def native_run_valid(run, jobs):
+    matrix = {f'{platform} / Go {version}' for platform in ('ubuntu-24.04', 'windows-2022', 'macos-15') for version in (CURRENT, NEXT)}
+    names = {j['name'] for j in jobs if j.get('conclusion') == 'success'}
+    return (run.get('conclusion') == 'success' and run.get('event') == 'push' and run.get('head_branch') == 'main'
+            and matrix <= names and 'Dependency policy' in names and 'Accepted validation plan' in names
+            and any(name.startswith('Race, coverage and CLI smoke') for name in names)
+            and all(j.get('conclusion') == 'success' for j in jobs))
+
+
+def native_recipe(text):
+    # A prior success is reusable only for unchanged native commands, actions,
+    # environments, matrix expansion and dependencies. Ignore just the job-level
+    # selection condition, whose new coordination branch is unit tested.
+    selected = []
+    for name, end in (('dependency-policy', 'test'), ('test', 'quality'), ('quality', 'accepted')):
+        part = text.split('  '+name+':\n', 1)[1].split('  '+end+':\n', 1)[0]
+        selected.append('\n'.join(line for line in part.splitlines() if not line.startswith('    if:')))
+    selected.append(text.split('\nenv:\n', 1)[1].split('\njobs:', 1)[0])
+    return hashlib.sha256('\n'.join(selected).encode()).hexdigest()
+
+
+def native_baseline():
+    repo, token = os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GH_TOKEN')
+    if not repo or not token:
+        return None
+    def api(path):
+        request = urllib.request.Request('https://api.github.com/repos/'+repo+path,
+            headers={'Authorization': 'Bearer '+token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'native-input-reuse'})
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.load(response)
+    try:
+        current = native_recipe(Path('.github/workflows/ci.yml').read_text())
+        runs = api('/actions/workflows/ci.yml/runs?status=success&event=push&branch=main&per_page=20')['workflow_runs']
+        for run in runs:
+            sha = run['head_sha']
+            if not re.fullmatch('[0-9a-f]{40}', sha):
+                continue
+            if subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], capture_output=True).returncode:
+                continue
+            changed = subprocess.check_output(['git', 'diff', '--name-only', sha, 'HEAD'], text=True).splitlines()
+            if choose('push', 'refs/heads/main', 'auto', changed)['mode'] != 'coordination':
+                continue
+            previous = subprocess.check_output(['git', 'show', sha+':.github/workflows/ci.yml'], text=True)
+            if native_recipe(previous) != current:
+                continue
+            jobs = api('/actions/runs/'+str(run['id'])+'/jobs?per_page=100')['jobs']
+            if len(jobs) < 100 and native_run_valid(run, jobs):
+                return dict(run_id=run['id'], sha=sha, recipe_sha256=current, verified=True)
+    except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError):
+        return None
+    return None
 
 
 def choose(event, ref, requested, paths):
@@ -51,6 +107,10 @@ def choose(event, ref, requested, paths):
 def gate(plan, jobs):
     if plan.get('mode') not in ('docs', 'coordination', 'quick', 'candidate') or plan.get('quality') != (plan['mode'] == 'candidate'):
         raise ValueError('invalid validation plan')
+    if plan['mode'] == 'coordination':
+        proof = plan.get('native_baseline', {})
+        if proof.get('verified') is not True or not re.fullmatch('[0-9a-f]{40}', proof.get('sha', '')) or not isinstance(proof.get('run_id'), int):
+            raise ValueError('coordination skips require verified native evidence')
     expected = {'plan': True, 'dependency-policy': plan['mode'] in ('quick', 'candidate'),
                 'test': plan['mode'] in ('quick', 'candidate'), 'quality': plan['quality']}
     for name, required in expected.items():
@@ -77,6 +137,13 @@ def main():
         paths = None
     plan = choose(os.environ['GITHUB_EVENT_NAME'], os.environ['GITHUB_REF'],
                   event.get('inputs', {}).get('validation', 'auto'), paths)
+    if plan['mode'] == 'coordination':
+        proof = native_baseline()
+        if proof:
+            plan['native_baseline'] = proof
+        else:
+            plan = choose(os.environ['GITHUB_EVENT_NAME'], os.environ['GITHUB_REF'], 'candidate', paths)
+            print('No matching successful native baseline; candidate validation is required')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
         output.write('plan=' + json.dumps(plan, separators=(',', ':')) + '\n')
         output.write('mode=' + plan['mode'] + '\n')

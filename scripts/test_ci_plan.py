@@ -1,6 +1,7 @@
 import copy
 import unittest
-from ci_plan import choose, gate
+from pathlib import Path
+from ci_plan import choose, gate, native_run_valid, native_recipe, CURRENT, NEXT
 
 
 class ValidationPlan(unittest.TestCase):
@@ -29,6 +30,7 @@ class ValidationPlan(unittest.TestCase):
     def test_gate_rejects_every_unexpected_job_state(self):
         for mode in ('docs', 'coordination', 'quick', 'candidate'):
             plan = dict(mode=mode, quality=mode == 'candidate')
+            if mode == 'coordination': plan['native_baseline'] = dict(verified=True, sha='a'*40, run_id=1)
             jobs = {name: dict(result='success' if required else 'skipped') for name, required in {
                 'plan': True, 'dependency-policy': mode in ('quick', 'candidate'), 'test': mode in ('quick', 'candidate'), 'quality': mode == 'candidate'}.items()}
             gate(plan, jobs)
@@ -54,6 +56,31 @@ class ValidationPlan(unittest.TestCase):
     def test_unknown_plan_cannot_authorize_skips(self):
         with self.assertRaises(ValueError): gate(dict(mode='unknown', quality=False), {})
         with self.assertRaises(ValueError): gate(dict(mode='candidate', quality=False), {})
+        with self.assertRaises(ValueError): gate(dict(mode='coordination', quality=False), {})
+
+    def test_reuse_requires_all_native_platforms_and_quality(self):
+        run=dict(conclusion='success', event='push', head_branch='main')
+        jobs=[dict(name=f'{os} / Go {go}', conclusion='success') for os in ('ubuntu-24.04','windows-2022','macos-15') for go in (CURRENT,NEXT)]
+        jobs += [dict(name=name,conclusion='success') for name in ('Dependency policy','Accepted validation plan','Race, coverage and CLI smoke tests')]
+        self.assertTrue(native_run_valid(run,jobs))
+        for i in range(len(jobs)):
+            self.assertFalse(native_run_valid(run,jobs[:i]+jobs[i+1:]))
+            for status in ('failure','cancelled','skipped',None):
+                broken=copy.deepcopy(jobs);broken[i]['conclusion']=status
+                self.assertFalse(native_run_valid(run,broken))
+        self.assertFalse(native_run_valid(dict(run,conclusion='failure'),jobs))
+
+    def test_native_recipe_rejects_changed_execution_inputs(self):
+        workflow=(Path(__file__).resolve().parents[1]/'.github/workflows/ci.yml').read_text()
+        expected=native_recipe(workflow)
+        for old,new in [('run: go test ./...', 'run: go test -short ./...'),
+                        ("GOWORK: 'off'", "GOWORK: 'auto'"),
+                        ('fail-fast: false','fail-fast: true'),
+                        ("go-version: '1.26.10'", "go-version: '1.27.3'")]:
+            self.assertIn(old,workflow)
+            self.assertNotEqual(native_recipe(workflow.replace(old,new)),expected)
+        selected=workflow.replace("    if: needs.plan.outputs.mode == 'quick' || needs.plan.outputs.mode == 'candidate'", "    if: needs.plan.outputs.mode != 'docs'")
+        self.assertEqual(native_recipe(selected),expected)
 
 
 if __name__ == '__main__': unittest.main()
