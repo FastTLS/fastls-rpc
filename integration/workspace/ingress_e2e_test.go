@@ -86,7 +86,7 @@ func ingressStart(t *testing.T, kind, binary string, args ...string) (string, *t
 func TestWorkspaceIngressBinaries(t *testing.T) {
 	rpc, root := workspaceDirectories(t)
 	binaries := map[string]string{
-		"fetch":   testprocess.BuildInDir(t, filepath.Join(root, "fastls-fetch-ftransport"), ".", "fetch"),
+		"fetch":   testprocess.BuildInDir(t, workspaceRepository(root, "fastls-fetch"), ".", "fetch"),
 		"jsonrpc": testprocess.BuildInDir(t, rpc, "./jsonrpc", "jsonrpc"),
 		"grpc":    testprocess.BuildInDir(t, rpc, "./grpc", "grpc"),
 	}

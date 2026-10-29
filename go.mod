@@ -3,7 +3,7 @@ module github.com/FastTLS/fastls-rpc
 go 1.26.0
 
 require (
-	github.com/FastTLS/fastls v0.1.2
+	github.com/FastTLS/fastls v0.1.3-0.20261029044750-32699153caa1
 	github.com/FastTLS/imitate v0.1.1
 	github.com/andybalholm/brotli v1.2.0
 	github.com/gin-gonic/gin v1.11.0

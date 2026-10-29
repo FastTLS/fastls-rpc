@@ -54,10 +54,10 @@ func TestWorkspaceUnifiedResponseContract(t *testing.T) {
 		}
 		return out
 	}
-	fetchBinary := build(filepath.Join(root, "fastls-fetch-ftransport"), ".", "fetch")
+	fetchBinary := build(workspaceRepository(root, "fastls-fetch"), ".", "fetch")
 	rpcBinary := build(rpcRoot, "./jsonrpc", "jsonrpc")
 	grpcBinary := build(rpcRoot, "./grpc", "grpc")
-	mitmBinary := build(filepath.Join(root, "fastls-mitm-ftransport"), ".", "mitm")
+	mitmBinary := build(workspaceRepository(root, "fastls-mitm"), ".", "mitm")
 	addresses := map[string]string{}
 	var mitmCA string
 	for kind, binary := range map[string]string{"fetch": fetchBinary, "jsonrpc": rpcBinary, "grpc": grpcBinary, "mitm": mitmBinary} {
@@ -241,20 +241,6 @@ func TestWorkspaceUnifiedResponseContract(t *testing.T) {
 									err = json.NewDecoder(resp.Body).Decode(&result)
 								}
 								return result, err
-							}
-							if protocol == "http" && route == "mitm" && entry != "net-http" {
-								ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-								defer cancel()
-								result, err := call(ctx, "/binary", false)
-								if entry == "core" {
-									if err == nil {
-										t.Fatal("cleartext CONNECT unexpectedly succeeded; review compatibility boundary")
-									}
-								} else if err != nil || result.OK || result.ErrorCode != "request_error" {
-									t.Fatalf("cleartext CONNECT result=%+v err=%v", result, err)
-								}
-								t.Log("Known compatibility difference: core uses CONNECT for an HTTP destination; default MITM expects TLS after CONNECT. Absolute-form HTTP proxy requests are covered by net-http and the MITM binary suite.")
-								return
 							}
 							t.Run("caller-cancel-releases-origin", func(t *testing.T) {
 								ctx, cancel := context.WithCancel(context.Background())

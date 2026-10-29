@@ -34,9 +34,9 @@ func TestWorkspaceDependencyAlignment(t *testing.T) {
 		root       string
 		modulePath string
 	}{
-		{name: "fastls-fetch", root: filepath.Join(workspaceRoot, "fastls-fetch-ftransport"), modulePath: "github.com/FastTLS/fastls-fetch"},
+		{name: "fastls-fetch", root: workspaceRepository(workspaceRoot, "fastls-fetch"), modulePath: "github.com/FastTLS/fastls-fetch"},
 		{name: "fastls-rpc", root: rpcRoot, modulePath: "github.com/FastTLS/fastls-rpc"},
-		{name: "fastls-mitm", root: filepath.Join(workspaceRoot, "fastls-mitm-ftransport"), modulePath: "github.com/FastTLS/fastls-mitm"},
+		{name: "fastls-mitm", root: workspaceRepository(workspaceRoot, "fastls-mitm"), modulePath: "github.com/FastTLS/fastls-mitm"},
 	}
 	sharedDependencies := []string{
 		"github.com/FastTLS/fastls",
@@ -105,8 +105,8 @@ func readGoMod(t testing.TB, directory string) goModManifest {
 
 func TestWorkspaceBinariesThroughMITM(t *testing.T) {
 	rpcRoot, workspaceRoot := workspaceDirectories(t)
-	fetchRoot := filepath.Join(workspaceRoot, "fastls-fetch-ftransport")
-	mitmRoot := filepath.Join(workspaceRoot, "fastls-mitm-ftransport")
+	fetchRoot := workspaceRepository(workspaceRoot, "fastls-fetch")
+	mitmRoot := workspaceRepository(workspaceRoot, "fastls-mitm")
 
 	fetchBinary := testprocess.BuildInDir(t, fetchRoot, ".", "fastls-fetch")
 	jsonRPCBinary := testprocess.BuildInDir(t, rpcRoot, "./jsonrpc", "fastls-jsonrpc")
@@ -643,4 +643,14 @@ func postJSONStatus(t testing.TB, endpoint string, value, result any, expectedSt
 	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Preserve legacy coordination layouts while accepting the isolated canonical
+// repository names used by a consolidated candidate workspace.
+func workspaceRepository(root, name string) string {
+	legacy := filepath.Join(root, name+"-ftransport")
+	if info, err := os.Stat(legacy); err == nil && info.IsDir() {
+		return legacy
+	}
+	return filepath.Join(root, name)
 }

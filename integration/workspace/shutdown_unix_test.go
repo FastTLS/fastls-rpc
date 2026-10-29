@@ -20,10 +20,10 @@ import (
 
 func TestWorkspaceBinariesExitOnInterrupt(t *testing.T) {
 	rpcRoot, workspaceRoot := workspaceDirectories(t)
-	fetchBinary := testprocess.BuildInDir(t, filepath.Join(workspaceRoot, "fastls-fetch-ftransport"), ".", "fastls-fetch")
+	fetchBinary := testprocess.BuildInDir(t, workspaceRepository(workspaceRoot, "fastls-fetch"), ".", "fastls-fetch")
 	jsonRPCBinary := testprocess.BuildInDir(t, rpcRoot, "./jsonrpc", "fastls-jsonrpc")
 	grpcBinary := testprocess.BuildInDir(t, rpcRoot, "./grpc", "fastls-grpc")
-	mitmBinary := testprocess.BuildInDir(t, filepath.Join(workspaceRoot, "fastls-mitm-ftransport"), ".", "fastls-mitm")
+	mitmBinary := testprocess.BuildInDir(t, workspaceRepository(workspaceRoot, "fastls-mitm"), ".", "fastls-mitm")
 
 	fetchAddress := testprocess.ReserveLoopbackAddress(t)
 	fetchProcess := testprocess.Start(t, fetchBinary, "-addr", fetchAddress)
