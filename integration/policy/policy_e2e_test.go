@@ -78,9 +78,9 @@ func policyGraph(t *testing.T) string {
 		t.Fatal("formal policy tests require GOWORK=off")
 	}
 	rpc, root := directories(t)
-	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.2", "github.com/FastTLS/ftransport": "v0.1.1",
+	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.3-0.20261029044750-32699153caa1", "github.com/FastTLS/ftransport": "v0.1.1",
 		"github.com/FastTLS/imitate": "v0.1.1", "github.com/FastTLS/fastls/profile": "v0.1.0"}
-	for _, directory := range []string{rpc, filepath.Join(root, "fastls-fetch-ftransport"), filepath.Join(root, "fastls-mitm-ftransport")} {
+	for _, directory := range []string{rpc, policyRepository(root, "fastls-fetch"), policyRepository(root, "fastls-mitm")} {
 		args := []string{"list", "-m", "-json", "github.com/FastTLS/fastls", "github.com/FastTLS/ftransport", "github.com/FastTLS/imitate", "github.com/FastTLS/fastls/profile"}
 		command := exec.Command("go", args...)
 		command.Dir = directory
@@ -112,6 +112,14 @@ func policyGraph(t *testing.T) string {
 		t.Logf("formal policy graph verified: %s", directory)
 	}
 	return "off"
+}
+
+func policyRepository(root, name string) string {
+	legacy := filepath.Join(root, name+"-ftransport")
+	if info, err := os.Stat(legacy); err == nil && info.IsDir() {
+		return legacy
+	}
+	return filepath.Join(root, name)
 }
 
 func legacyPolicyModfile(t *testing.T, directory string) string {
@@ -282,7 +290,7 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 	}
 	rpc, root := directories(t)
 	binaries := map[string]string{
-		"fetch":   build(t, filepath.Join(root, "fastls-fetch-ftransport"), ".", "fetch", workspace),
+		"fetch":   build(t, policyRepository(root, "fastls-fetch"), ".", "fetch", workspace),
 		"jsonrpc": build(t, rpc, "./jsonrpc", "jsonrpc", workspace),
 		"grpc":    build(t, rpc, "./grpc", "grpc", workspace),
 	}
@@ -393,7 +401,7 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 
 func TestLegacyCoreRefusesRequestedPolicy(t *testing.T) {
 	rpc, root := directories(t)
-	for _, entry := range []struct{ kind, dir, pkg string }{{"fetch", filepath.Join(root, "fastls-fetch-ftransport"), "."}, {"jsonrpc", rpc, "./jsonrpc"}, {"grpc", rpc, "./grpc"}} {
+	for _, entry := range []struct{ kind, dir, pkg string }{{"fetch", policyRepository(root, "fastls-fetch"), "."}, {"jsonrpc", rpc, "./jsonrpc"}, {"grpc", rpc, "./grpc"}} {
 		t.Run(entry.kind, func(t *testing.T) {
 			// Preserve the old unsupported-core refusal independently of the
 			// production graph, which now supports policy at fastls v0.1.2.

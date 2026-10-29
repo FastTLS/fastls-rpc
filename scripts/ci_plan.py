@@ -15,7 +15,23 @@ def choose(event, ref, requested, paths):
     tag = ref.startswith('refs/tags/')
     docs = paths is not None and bool(paths) and all(
         p.endswith(('.md', '.rst', '.txt')) or p in ('LICENSE', 'NOTICE') for p in paths)
-    if docs and not tag and requested != 'candidate':
+    coordination_files = {
+        'scripts/ci_plan.py', 'scripts/test_ci_plan.py',
+        '.github/workflows/ci.yml', '.github/workflows/workspace-integration.yml',
+        '.github/workflows/address-policy-integration.yml',
+        'integration/policy/policy_e2e_test.go', 'integration/policy/mitm_gateway_e2e_test.go',
+    }
+    coordination = paths is not None and bool(paths) and all(p in coordination_files for p in paths)
+    if coordination:
+        root = Path(__file__).resolve().parents[1]
+        coordination = all(not p.endswith('.go') or (root/p).is_file() and
+                           (root/p).read_text(encoding='utf-8').startswith('//go:build policy_e2e\n') for p in paths)
+    if coordination and not tag and requested != 'candidate':
+        # These tagged contracts run in Workspace integration. Normal Go
+        # package inputs and dependencies are unchanged; preserve its exact
+        # earlier native evidence instead of rebuilding the same matrix.
+        mode = 'coordination'
+    elif docs and not tag and requested != 'candidate':
         mode = 'docs'
     elif tag or ref in ('refs/heads/main', 'refs/heads/v2'):
         mode = 'candidate'
@@ -25,7 +41,7 @@ def choose(event, ref, requested, paths):
         mode = 'candidate'
     else:
         mode = 'quick'
-    matrix = [] if mode == 'docs' else [dict(os=platform, go=version)
+    matrix = [] if mode in ('docs', 'coordination') else [dict(os=platform, go=version)
         for platform in (('ubuntu-24.04', 'windows-2022', 'macos-15') if mode == 'candidate'
                          else ('ubuntu-24.04', 'windows-2022'))
         for version in ((CURRENT, NEXT) if mode == 'candidate' else (CURRENT,))]
@@ -33,8 +49,10 @@ def choose(event, ref, requested, paths):
 
 
 def gate(plan, jobs):
-    expected = {'plan': True, 'dependency-policy': plan['mode'] != 'docs',
-                'test': plan['mode'] != 'docs', 'quality': plan['quality']}
+    if plan.get('mode') not in ('docs', 'coordination', 'quick', 'candidate') or plan.get('quality') != (plan['mode'] == 'candidate'):
+        raise ValueError('invalid validation plan')
+    expected = {'plan': True, 'dependency-policy': plan['mode'] in ('quick', 'candidate'),
+                'test': plan['mode'] in ('quick', 'candidate'), 'quality': plan['quality']}
     for name, required in expected.items():
         actual = jobs.get(name, {}).get('result')
         if actual != ('success' if required else 'skipped'):

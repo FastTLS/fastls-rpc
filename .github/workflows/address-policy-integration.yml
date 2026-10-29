@@ -25,7 +25,7 @@ on:
       core_ref:
         description: Reviewed fastls ref containing WithAddressPolicyJSON and CheckAddressPolicy
         required: true
-        default: cb551d82fe4a3bc51e848b36d22180fb9b0aa798
+        default: 32699153caa15a9bbbe11e178465a315d3b59861
         type: string
       transport_ref:
         description: Reviewed ftransport ref

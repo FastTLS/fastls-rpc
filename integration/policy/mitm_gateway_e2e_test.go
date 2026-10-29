@@ -28,7 +28,7 @@ func TestMITMGatewayEnforcesPolicyForThreeRequestServices(t *testing.T) {
 	}
 	target.StartTLS()
 	defer target.Close()
-	binary := build(t, filepath.Join(root, "fastls-mitm-ftransport"), ".", "policy-mitm", workspace)
+	binary := build(t, policyRepository(root, "fastls-mitm"), ".", "policy-mitm", workspace)
 	address := testprocess.ReserveLoopbackAddress(t)
 	directory := t.TempDir()
 	gateway := testprocess.Start(t, binary, "-addr", address, "-address-policy", policyFile(t, map[string]any{"allow_hosts": []string{"127.0.0.1"}, "allow_cidrs": []string{"127.0.0.1/32"}}), "-ca-cert", filepath.Join(directory, "ca.pem"), "-ca-key", filepath.Join(directory, "key.pem"))
@@ -37,7 +37,7 @@ func TestMITMGatewayEnforcesPolicyForThreeRequestServices(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			dir, pkg := rpc, "./"+kind
 			if kind == "fetch" {
-				dir = filepath.Join(root, "fastls-fetch-ftransport")
+				dir = policyRepository(root, "fastls-fetch")
 				pkg = "."
 			}
 			service := build(t, dir, pkg, kind, workspace)

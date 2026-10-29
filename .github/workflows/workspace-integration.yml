@@ -11,6 +11,8 @@ on:
       - 'jsonrpc/**'
       - 'internal/**'
       - 'integration/workspace/**'
+      - 'integration/policy/**'
+      - '.github/workflows/address-policy-integration.yml'
   pull_request:
     paths:
       - '.github/workflows/workspace-integration.yml'
@@ -20,6 +22,8 @@ on:
       - 'jsonrpc/**'
       - 'internal/**'
       - 'integration/workspace/**'
+      - 'integration/policy/**'
+      - '.github/workflows/address-policy-integration.yml'
   workflow_dispatch:
     inputs:
       development_policy:
@@ -47,15 +51,15 @@ permissions:
 
 env:
   GOWORK: 'off'
-  FETCH_REF: ${{ inputs.fetch_ref || 'main' }}
-  MITM_REF: ${{ inputs.mitm_ref || 'main' }}
+  FETCH_REF: ${{ inputs.fetch_ref || 'cfafeee1f804b5697cb5d6df9762359ede7d180a' }}
+  MITM_REF: ${{ inputs.mitm_ref || '1a6fb2869160288cd81b1d800dfef5cb37b385dc' }}
 
 jobs:
   development-policy:
     if: github.event_name == 'workflow_dispatch' && inputs.development_policy
     uses: ./.github/workflows/address-policy-integration.yml
     with:
-      core_ref: cb551d82fe4a3bc51e848b36d22180fb9b0aa798
+      core_ref: 32699153caa15a9bbbe11e178465a315d3b59861
       transport_ref: d5afcd1a2db48a40850363b76e8a19eb339c757c
       imitate_ref: fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e
       fetch_ref: ${{ inputs.fetch_ref }}

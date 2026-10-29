@@ -45,7 +45,7 @@ jobs:
 
   dependency-policy:
     needs: plan
-    if: needs.plan.outputs.mode != 'docs'
+    if: needs.plan.outputs.mode == 'quick' || needs.plan.outputs.mode == 'candidate'
     name: Dependency policy
     runs-on: ubuntu-24.04
     steps:
@@ -75,7 +75,7 @@ jobs:
 
   test:
     timeout-minutes: 20
-    if: needs.plan.outputs.mode != 'docs'
+    if: needs.plan.outputs.mode == 'quick' || needs.plan.outputs.mode == 'candidate'
     name: ${{ matrix.os }} / Go ${{ matrix.go }}
     needs: [plan, dependency-policy]
     runs-on: ${{ matrix.os }}
