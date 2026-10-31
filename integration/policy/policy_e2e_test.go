@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +47,25 @@ func directories(t *testing.T) (string, string) {
 
 func build(t *testing.T, directory, pkg, name, workspace string, modfile ...string) string {
 	t.Helper()
+	if prebuilt := os.Getenv("FASTLS_POLICY_BIN_DIR"); prebuilt != "" && len(modfile) == 0 {
+		if workspace != "off" || !filepath.IsAbs(prebuilt) {
+			t.Fatal("release smoke requires an absolute binary directory and GOWORK=off")
+		}
+		names := map[string]string{"fetch": "fastls-fetch", "jsonrpc": "fastls-jsonrpc", "grpc": "fastls-grpc", "policy-mitm": "fastls-mitm"}
+		binary, ok := names[name]
+		if !ok {
+			t.Fatalf("unrecognized prebuilt component %q", name)
+		}
+		if runtime.GOOS == "windows" {
+			binary += ".exe"
+		}
+		path := filepath.Join(prebuilt, binary)
+		if info, err := os.Stat(path); err != nil || info.IsDir() {
+			t.Fatalf("required release executable missing: %s", path)
+		}
+		t.Logf("using verified release executable: %s", path)
+		return path
+	}
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
@@ -78,8 +98,8 @@ func policyGraph(t *testing.T) string {
 		t.Fatal("formal policy tests require GOWORK=off")
 	}
 	rpc, root := directories(t)
-	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.3-0.20261029044750-32699153caa1", "github.com/FastTLS/ftransport": "v0.1.1",
-		"github.com/FastTLS/imitate": "v0.1.1", "github.com/FastTLS/fastls/profile": "v0.1.0"}
+	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.3-0.20261030152832-0dc4eea0f32e", "github.com/FastTLS/ftransport": "v0.1.2-0.20261030131050-d9812320808e",
+		"github.com/FastTLS/imitate": "v0.1.2-0.20261030131552-ebd18547d28a", "github.com/FastTLS/fastls/profile": "v0.1.1-0.20261030130219-e9e40f15c9ac"}
 	for _, directory := range []string{rpc, policyRepository(root, "fastls-fetch"), policyRepository(root, "fastls-mitm")} {
 		args := []string{"list", "-m", "-json", "github.com/FastTLS/fastls", "github.com/FastTLS/ftransport", "github.com/FastTLS/imitate", "github.com/FastTLS/fastls/profile"}
 		command := exec.Command("go", args...)
@@ -295,11 +315,12 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 		"grpc":    build(t, rpc, "./grpc", "grpc", workspace),
 	}
 	var hits, forbidden, proxyHits atomic.Int32
+	var connections atomic.Int32
 	forbiddenPeer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { forbidden.Add(1) }))
 	defer forbiddenPeer.Close()
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { proxyHits.Add(1) }))
 	defer proxy.Close()
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	target := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		if r.URL.Path == "/redirect" {
 			http.Redirect(w, r, strings.Replace(forbiddenPeer.URL, "127.0.0.1", "localhost", 1), 302)
@@ -307,6 +328,12 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 		}
 		io.WriteString(w, "ok")
 	}))
+	target.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+	}
+	target.Start()
 	defer target.Close()
 	tlsTarget := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "tls-ok") }))
 	tlsTarget.EnableHTTP2 = true
@@ -385,6 +412,16 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 					}
 				})
 			}
+			t.Run("unspecified targets cannot bypass loopback denial", func(t *testing.T) {
+				call, _ := start(t, kind, binaries[kind], map[string]any{"allow_cidrs": []string{"0.0.0.0/0", "::/0"}, "deny_cidrs": []string{"127.0.0.0/8", "::1/128"}})
+				for _, host := range []string{"0.0.0.0", "::", "::ffff:0.0.0.0"} {
+					before := connections.Load()
+					response := call(map[string]any{"url": "http://" + net.JoinHostPort(host, u.Port()) + "/"})
+					if response.OK || response.ErrorCode != "address_denied" || !strings.Contains(response.Error, "invalid_ip") || connections.Load() != before {
+						t.Fatalf("unspecified destination %s reached dial or lost typed denial: %+v", host, response)
+					}
+				}
+			})
 			t.Run("HTTP2 remains usable", func(t *testing.T) {
 				call, _ := start(t, kind, binaries[kind], map[string]any{"allow_schemes": []string{"https"}, "allow_hosts": []string{"127.0.0.1"}, "allow_cidrs": []string{"127.0.0.1/32"}})
 				response := call(map[string]any{"url": tlsTarget.URL})
@@ -400,6 +437,10 @@ func TestServiceAddressPolicyAcrossEntries(t *testing.T) {
 }
 
 func TestLegacyCoreRefusesRequestedPolicy(t *testing.T) {
+	// Historical module versions must be authenticated independently of a
+	// developer's shared cache; its metadata may belong to an older checkout.
+	t.Setenv("GOMODCACHE", t.TempDir())
+	t.Setenv("GOFLAGS", os.Getenv("GOFLAGS")+" -modcacherw")
 	rpc, root := directories(t)
 	for _, entry := range []struct{ kind, dir, pkg string }{{"fetch", policyRepository(root, "fastls-fetch"), "."}, {"jsonrpc", rpc, "./jsonrpc"}, {"grpc", rpc, "./grpc"}} {
 		t.Run(entry.kind, func(t *testing.T) {

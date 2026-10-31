@@ -4,7 +4,7 @@
 
 FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
-> 当前状态：[`v0.1.0`](https://github.com/FastTLS/fastls-rpc/releases/tag/v0.1.0) 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+> 当前状态：[`v0.1.2`](https://github.com/FastTLS/fastls-rpc/releases/tag/v0.1.2) 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
 
 当前开发分支为JSON-RPC/gRPC增加完整多值响应头、按需附带的原始正文Base64、错误分类和可选响应字节/并发上限；另提供max-request-bytes启动参数，默认4MiB，可配置1字节至64MiB，0选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf新增请求字段15与响应字段9–12，旧字段保持不变；这些变更尚未发布。
 
@@ -27,7 +27,7 @@ JSON-RPC 适合无需生成客户端的 HTTP 集成；gRPC 适合需要 Protobuf
 
 ## 环境要求
 
-开发源码另增加可信`-address-policy`启动选项，见[地址策略与核心能力检查](ADDRESS_POLICY.md)。当前公开核心v0.1.1不支持它，指定后拒绝启动；只有显式开发工作区链接的新核心可启用，不能将默认构建误认为已获得访问控制。
+v0.1.2 的独立发行二进制支持可信 `-address-policy` 启动配置，并拒绝未指定目标地址，见[地址策略与升级](ADDRESS_POLICY.md)。策略默认关闭，旧二进制需显式升级。
 
 - Go 1.26 或更高版本；CI 同时覆盖 Go 1.26.10 和 1.27.3
 - 使用仓库自己的 `go.mod`，建议设置 `GOWORK=off`
@@ -103,7 +103,7 @@ go vet ./...
 go build ./...
 ```
 
-GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依赖策略、单元/集成测试、竞态检测、覆盖率、静态检查、两种服务构建和 CLI 冒烟测试。`main` 分支生成临时开发包；`v*` 标签会生成同时包含两个二进制的六个平台正式包、SHA-256 校验和与 Sigstore/GitHub 来源证明，并只发布到 GitHub Releases。
+GitHub Actions 覆盖 Windows、Linux、macOS 与两个 Go 版本，并执行依赖策略、单元/集成测试、竞态检测、覆盖率、静态检查、两种服务构建和 CLI 冒烟测试。手动工作流生成临时开发包；`v*` 标签会生成同时包含两个二进制的六个平台正式包、SHA-256 校验和与 Sigstore/GitHub 来源证明，并只发布到 GitHub Releases。
 
 本地集成测试共用环回目标与 CONNECT 代理夹具，覆盖请求体/请求头/Cookie、请求与响应 Trailer、最终协议/URL、压缩响应、禁用重定向、代理优先级、取消传播、JSON-RPC 的 CORS/请求大小边界，以及两个 RPC 适配层的字段映射；不访问公网。
 
@@ -143,3 +143,5 @@ FastTLS 自有代码采用 [Apache-2.0](LICENSE)，见 [NOTICE](NOTICE)。依赖
 ## Development audit
 
 [Optional audit events and limits](AUDIT.md): disabled by default, with fixed redacted fields and bounded drain. This is a development candidate.
+
+发行构建先核对同一完整提交在 main 的成功 CI；RPC 同时要求完整服务联调成功。缺失、失败、取消或未获准跳过均阻止构建。main 保留常规验收，开发归档改为手动生成，正式标签只构建一次六平台发行字节；标签阶段复用精确候选证据，另验摘要、来源与真实安装。

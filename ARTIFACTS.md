@@ -2,7 +2,7 @@
 
 ## 范围与内容
 
-`Development artifacts` 工作流在 `main` 更新或手动触发时提供保留 14 天的开发构建；推送 `v*` 标签时，它会在验证成功后创建正式 GitHub Release。不会发布到 GitHub 之外的渠道。
+`Development artifacts` 工作流在手动触发时提供保留 14 天的开发构建；推送 `v*` 标签时，它会在验证成功后创建正式 GitHub Release。不会发布到 GitHub 之外的渠道。
 
 每个 Linux、Windows、macOS 的 amd64/arm64 归档都包含：
 
@@ -61,3 +61,5 @@ gh attestation verify fastls-rpc-dev-COMMIT-linux-amd64.tar.gz \
 ## 签发链路
 
 工作流先校验 module、测试和静态检查，再用 `CGO_ENABLED=0`、`-trimpath` 和嵌入的提交信息构建两个服务。随后计算归档 SHA-256，使用 GitHub OIDC/Sigstore 生成 SLSA provenance，并用限定仓库及签发工作流的策略自验证后上传。
+
+发行构建先核对同一完整提交在 main 的成功 CI；RPC 同时要求完整服务联调成功。缺失、失败、取消或未获准跳过均阻止构建。main 保留常规验收，开发归档改为手动生成，正式标签只构建一次六平台发行字节；标签阶段复用精确候选证据，另验摘要、来源与真实安装。

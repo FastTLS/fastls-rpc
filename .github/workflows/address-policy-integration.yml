@@ -25,12 +25,12 @@ on:
       core_ref:
         description: Reviewed fastls ref containing WithAddressPolicyJSON and CheckAddressPolicy
         required: true
-        default: 32699153caa15a9bbbe11e178465a315d3b59861
+        default: 0dc4eea0f32ebc86b538f17cac383e80cd5c03eb
         type: string
       transport_ref:
         description: Reviewed ftransport ref
         required: true
-        default: d5afcd1a2db48a40850363b76e8a19eb339c757c
+        default: d9812320808e775b531eca3340d1cc4fb32b7e01
         type: string
       fetch_ref:
         description: Reviewed fastls-fetch ref containing the service policy flag
@@ -43,7 +43,7 @@ on:
       imitate_ref:
         description: Reviewed imitate full commit SHA
         required: true
-        default: fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e
+        default: ebd18547d28a8a86c739816b5e7f45086e2b5449
         type: string
 
 permissions:

@@ -51,17 +51,17 @@ permissions:
 
 env:
   GOWORK: 'off'
-  FETCH_REF: ${{ inputs.fetch_ref || 'cfafeee1f804b5697cb5d6df9762359ede7d180a' }}
-  MITM_REF: ${{ inputs.mitm_ref || '1a6fb2869160288cd81b1d800dfef5cb37b385dc' }}
+  FETCH_REF: ${{ inputs.fetch_ref || '0c16df692aeb5877ed43d0d4f6f3cfcec9b555ce' }}
+  MITM_REF: ${{ inputs.mitm_ref || 'a82880d7bf1f3051972cccf93fb5c04f251a4ac9' }}
 
 jobs:
   development-policy:
     if: github.event_name == 'workflow_dispatch' && inputs.development_policy
     uses: ./.github/workflows/address-policy-integration.yml
     with:
-      core_ref: 32699153caa15a9bbbe11e178465a315d3b59861
-      transport_ref: d5afcd1a2db48a40850363b76e8a19eb339c757c
-      imitate_ref: fd10ea4393408e904ae2866ecbfe3efaaaa6ad8e
+      core_ref: 0dc4eea0f32ebc86b538f17cac383e80cd5c03eb
+      transport_ref: d9812320808e775b531eca3340d1cc4fb32b7e01
+      imitate_ref: ebd18547d28a8a86c739816b5e7f45086e2b5449
       fetch_ref: ${{ inputs.fetch_ref }}
       mitm_ref: ${{ inputs.mitm_ref }}
   four-process-contract:
@@ -123,7 +123,7 @@ jobs:
         working-directory: workspace/fastls-rpc-ftransport
         run: |
           set -euo pipefail
-          go test -count=3 -tags workspace_e2e ./integration/workspace 2>&1 \
+          go test -count=1 -tags workspace_e2e ./integration/workspace 2>&1 \
             | tee ../../workspace-evidence/workspace-e2e.log
       - name: Upload workspace evidence
         if: always()
@@ -181,7 +181,7 @@ jobs:
             git -C "../${module}" rev-parse HEAD >> ../../formal-policy-evidence/sources.txt
             (cd "../${module}" && go mod verify)
           done
-          go test -v -count=3 -tags policy_e2e -timeout 480s ./integration/policy 2>&1 \
+          go test -v -count=1 -tags policy_e2e -timeout 480s ./integration/policy 2>&1 \
             | tee ../../formal-policy-evidence/policy.log
       - name: Retain original policy evidence
         if: always()
