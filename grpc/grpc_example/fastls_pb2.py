@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x66\x61stls.proto\x12\x06\x66\x61stls\"\x0f\n\rHealthRequest\" \n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"\x96\x04\n\x0c\x46\x65tchRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12\x32\n\x07headers\x18\x03 \x03(\x0b\x32!.fastls.FetchRequest.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05proxy\x18\x05 \x01(\t\x12\x0f\n\x07timeout\x18\x06 \x01(\x05\x12\x18\n\x10\x64isable_redirect\x18\x07 \x01(\x08\x12\x12\n\nuser_agent\x18\x08 \x01(\t\x12(\n\x0b\x66ingerprint\x18\t \x01(\x0b\x32\x13.fastls.Fingerprint\x12\x0f\n\x07\x62rowser\x18\n \x01(\t\x12\x1f\n\x07\x63ookies\x18\x0b \x03(\x0b\x32\x0e.fastls.Cookie\x12\x1d\n\x15http2_settings_string\x18\x0c \x01(\t\x12\x14\n\x0cparent_proxy\x18\r \x01(\t\x12\x34\n\x08trailers\x18\x0e \x03(\x0b\x32\".fastls.FetchRequest.TrailersEntry\x12\x1b\n\x13include_body_base64\x18\x0f \x01(\x08\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x45\n\rTrailersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\"\x1e\n\x0cHeaderValues\x12\x0e\n\x06values\x18\x01 \x03(\t\"*\n\x0b\x46ingerprint\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x06\x43ookie\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0e\n\x06\x64omain\x18\x04 \x01(\t\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\thttp_only\x18\x06 \x01(\x08\x12\x0e\n\x06secure\x18\x07 \x01(\x08\"\x9b\x04\n\rFetchResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0e\n\x06status\x18\x02 \x01(\x05\x12\x33\n\x07headers\x18\x03 \x03(\x0b\x32\".fastls.FetchResponse.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\x12\x10\n\x08protocol\x18\x06 \x01(\t\x12\x11\n\tfinal_url\x18\x07 \x01(\t\x12\x35\n\x08trailers\x18\x08 \x03(\x0b\x32#.fastls.FetchResponse.TrailersEntry\x12>\n\rheader_values\x18\t \x03(\x0b\x32\'.fastls.FetchResponse.HeaderValuesEntry\x12\x13\n\x0b\x62ody_base64\x18\n \x01(\t\x12\x12\n\nerror_code\x18\x0b \x01(\t\x12\x15\n\rtimeout_phase\x18\x0c \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x45\n\rTrailersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\x1aI\n\x11HeaderValuesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\x32~\n\rFastlsService\x12\x37\n\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x12\x34\n\x05\x46\x65tch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB*Z(github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x66\x61stls.proto\x12\x06\x66\x61stls\"\x0f\n\rHealthRequest\" \n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"\xac\x04\n\x0c\x46\x65tchRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12\x32\n\x07headers\x18\x03 \x03(\x0b\x32!.fastls.FetchRequest.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05proxy\x18\x05 \x01(\t\x12\x0f\n\x07timeout\x18\x06 \x01(\x05\x12\x18\n\x10\x64isable_redirect\x18\x07 \x01(\x08\x12\x12\n\nuser_agent\x18\x08 \x01(\t\x12(\n\x0b\x66ingerprint\x18\t \x01(\x0b\x32\x13.fastls.Fingerprint\x12\x0f\n\x07\x62rowser\x18\n \x01(\t\x12\x1f\n\x07\x63ookies\x18\x0b \x03(\x0b\x32\x0e.fastls.Cookie\x12\x1d\n\x15http2_settings_string\x18\x0c \x01(\t\x12\x14\n\x0cparent_proxy\x18\r \x01(\t\x12\x34\n\x08trailers\x18\x0e \x03(\x0b\x32\".fastls.FetchRequest.TrailersEntry\x12\x1b\n\x13include_body_base64\x18\x0f \x01(\x08\x12\x14\n\x0chttp_version\x18\x10 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x45\n\rTrailersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\"\x1e\n\x0cHeaderValues\x12\x0e\n\x06values\x18\x01 \x03(\t\"*\n\x0b\x46ingerprint\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x06\x43ookie\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0e\n\x06\x64omain\x18\x04 \x01(\t\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\thttp_only\x18\x06 \x01(\x08\x12\x0e\n\x06secure\x18\x07 \x01(\x08\"\x9b\x04\n\rFetchResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0e\n\x06status\x18\x02 \x01(\x05\x12\x33\n\x07headers\x18\x03 \x03(\x0b\x32\".fastls.FetchResponse.HeadersEntry\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\x12\x10\n\x08protocol\x18\x06 \x01(\t\x12\x11\n\tfinal_url\x18\x07 \x01(\t\x12\x35\n\x08trailers\x18\x08 \x03(\x0b\x32#.fastls.FetchResponse.TrailersEntry\x12>\n\rheader_values\x18\t \x03(\x0b\x32\'.fastls.FetchResponse.HeaderValuesEntry\x12\x13\n\x0b\x62ody_base64\x18\n \x01(\t\x12\x12\n\nerror_code\x18\x0b \x01(\t\x12\x15\n\rtimeout_phase\x18\x0c \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x45\n\rTrailersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\x1aI\n\x11HeaderValuesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.fastls.HeaderValues:\x02\x38\x01\x32~\n\rFastlsService\x12\x37\n\x06Health\x12\x15.fastls.HealthRequest\x1a\x16.fastls.HealthResponse\x12\x34\n\x05\x46\x65tch\x12\x14.fastls.FetchRequest\x1a\x15.fastls.FetchResponseB*Z(github.com/FastTLS/fastls-rpc/grpc/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -47,25 +47,25 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_HEALTHRESPONSE']._serialized_start=41
   _globals['_HEALTHRESPONSE']._serialized_end=73
   _globals['_FETCHREQUEST']._serialized_start=76
-  _globals['_FETCHREQUEST']._serialized_end=610
-  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_start=493
-  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_end=539
-  _globals['_FETCHREQUEST_TRAILERSENTRY']._serialized_start=541
-  _globals['_FETCHREQUEST_TRAILERSENTRY']._serialized_end=610
-  _globals['_HEADERVALUES']._serialized_start=612
-  _globals['_HEADERVALUES']._serialized_end=642
-  _globals['_FINGERPRINT']._serialized_start=644
-  _globals['_FINGERPRINT']._serialized_end=686
-  _globals['_COOKIE']._serialized_start=688
-  _globals['_COOKIE']._serialized_end=807
-  _globals['_FETCHRESPONSE']._serialized_start=810
-  _globals['_FETCHRESPONSE']._serialized_end=1349
-  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_start=493
-  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_end=539
-  _globals['_FETCHRESPONSE_TRAILERSENTRY']._serialized_start=541
-  _globals['_FETCHRESPONSE_TRAILERSENTRY']._serialized_end=610
-  _globals['_FETCHRESPONSE_HEADERVALUESENTRY']._serialized_start=1276
-  _globals['_FETCHRESPONSE_HEADERVALUESENTRY']._serialized_end=1349
-  _globals['_FASTLSSERVICE']._serialized_start=1351
-  _globals['_FASTLSSERVICE']._serialized_end=1477
+  _globals['_FETCHREQUEST']._serialized_end=632
+  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_start=515
+  _globals['_FETCHREQUEST_HEADERSENTRY']._serialized_end=561
+  _globals['_FETCHREQUEST_TRAILERSENTRY']._serialized_start=563
+  _globals['_FETCHREQUEST_TRAILERSENTRY']._serialized_end=632
+  _globals['_HEADERVALUES']._serialized_start=634
+  _globals['_HEADERVALUES']._serialized_end=664
+  _globals['_FINGERPRINT']._serialized_start=666
+  _globals['_FINGERPRINT']._serialized_end=708
+  _globals['_COOKIE']._serialized_start=710
+  _globals['_COOKIE']._serialized_end=829
+  _globals['_FETCHRESPONSE']._serialized_start=832
+  _globals['_FETCHRESPONSE']._serialized_end=1371
+  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_start=515
+  _globals['_FETCHRESPONSE_HEADERSENTRY']._serialized_end=561
+  _globals['_FETCHRESPONSE_TRAILERSENTRY']._serialized_start=563
+  _globals['_FETCHRESPONSE_TRAILERSENTRY']._serialized_end=632
+  _globals['_FETCHRESPONSE_HEADERVALUESENTRY']._serialized_start=1298
+  _globals['_FETCHRESPONSE_HEADERVALUESENTRY']._serialized_end=1371
+  _globals['_FASTLSSERVICE']._serialized_start=1373
+  _globals['_FASTLSSERVICE']._serialized_end=1499
 # @@protoc_insertion_point(module_scope)

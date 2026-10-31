@@ -121,6 +121,7 @@ type FetchRequest struct {
 	ParentProxy         string                   `protobuf:"bytes,13,opt,name=parent_proxy,json=parentProxy,proto3" json:"parent_proxy,omitempty"`                                                  // 上级代理地址（通过参数传递）
 	Trailers            map[string]*HeaderValues `protobuf:"bytes,14,rep,name=trailers,proto3" json:"trailers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 请求Trailer
 	IncludeBodyBase64   bool                     `protobuf:"varint,15,opt,name=include_body_base64,json=includeBodyBase64,proto3" json:"include_body_base64,omitempty"`                             // 按需附带响应原始正文Base64
+	HttpVersion         string                   `protobuf:"bytes,16,opt,name=http_version,json=httpVersion,proto3" json:"http_version,omitempty"`                                                  // 空值保持原行为；h3 显式要求 HTTPS/QUIC，不回退
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -258,6 +259,13 @@ func (x *FetchRequest) GetIncludeBodyBase64() bool {
 		return x.IncludeBodyBase64
 	}
 	return false
+}
+
+func (x *FetchRequest) GetHttpVersion() string {
+	if x != nil {
+		return x.HttpVersion
+	}
+	return ""
 }
 
 type HeaderValues struct {
@@ -590,7 +598,7 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x12proto/fastls.proto\x12\x06fastls\"\x0f\n" +
 	"\rHealthRequest\"(\n" +
 	"\x0eHealthResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\xd4\x05\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"\xf7\x05\n" +
 	"\fFetchRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12;\n" +
@@ -608,7 +616,8 @@ const file_proto_fastls_proto_rawDesc = "" +
 	"\x15http2_settings_string\x18\f \x01(\tR\x13http2SettingsString\x12!\n" +
 	"\fparent_proxy\x18\r \x01(\tR\vparentProxy\x12>\n" +
 	"\btrailers\x18\x0e \x03(\v2\".fastls.FetchRequest.TrailersEntryR\btrailers\x12.\n" +
-	"\x13include_body_base64\x18\x0f \x01(\bR\x11includeBodyBase64\x1a:\n" +
+	"\x13include_body_base64\x18\x0f \x01(\bR\x11includeBodyBase64\x12!\n" +
+	"\fhttp_version\x18\x10 \x01(\tR\vhttpVersion\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aQ\n" +

@@ -22,6 +22,8 @@ type Process struct {
 	waitErr error
 }
 
+func (p *Process) PID() int { return p.command.Process.Pid }
+
 func Build(t testing.TB, packagePath, name string) string {
 	return BuildInDir(t, "", packagePath, name)
 }

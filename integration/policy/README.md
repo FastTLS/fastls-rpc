@@ -25,3 +25,8 @@ MITM 仓库另外运行 `-tags mitm_policy_e2e ./...` 和对应竞态检查。�
 手动工作流 `address-policy-integration.yml` 要求五个外部仓库输入均为完整 40 位提交 SHA；Fetch/MITM 不提供可能缺少能力的 main 默认值。RPC 自身使用启动工作流选定的 ref，并将实际 SHA 与全部测试日志一并保存。工作流只运行测试，不创建 Release。远端三平台、双 Go 矩阵须单独通过，Windows 本机记录不构成该矩阵认证。
 
 以下为历史注册流程，当前工作流已在 main：新工作流尚未进入默认分支时，GitHub 不登记其手动入口。此时从已有 `Workspace integration` 工作流选择候选 RPC 分支，填写 Fetch/MITM 完整 SHA，并开启 `development_policy`；它将复用本候选中的策略工作流，以固定的新核心/传输/imitate 输入同时执行公开依赖联调与开发策略六组矩阵。默认关闭此选项，原有自动门禁保持公开依赖范围。
+
+
+## 显式 H3 服务验收
+
+`TestServiceExplicitH3AcrossEntries` 验证三入口真实 H3、有/无策略、证书与固定 CA、冲突、UDP 黑洞、重定向不降级、超时/取消与名额恢复。仅 Linux 正式安装验收设置 `FASTLS_H3_RESOURCE_SECONDS=300` 执行 `TestServiceH3ResourceRecovery`；其它任务明确跳过此独立资源观察，不能冒充已执行。阈值为暖机 15–45 秒与最后一分钟平均 RSS 增长最多 64 MiB，FD 峰值增长最多 24。

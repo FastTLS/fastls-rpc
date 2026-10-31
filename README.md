@@ -4,7 +4,9 @@
 
 FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
-> 当前状态：[`v0.1.2`](https://github.com/FastTLS/fastls-rpc/releases/tag/v0.1.2) 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+> 当前功能版本：`v0.2.0`；正式二进制以 [GitHub Releases](https://github.com/FastTLS/fastls-rpc/releases) 为准。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+
+新增 [显式出站 H3](H3.md)：三入口统一 `http_version=h3`、证书校验、可信启动 CA 与地址策略组合；缺省 H1/H2 保持。gRPC 请求新增字段 16，其余字段不变。
 
 v0.1.2 的 JSON-RPC/gRPC 提供完整多值响应头、按需附带的原始正文 Base64、错误分类和可选响应字节/并发上限；另提供 max-request-bytes 启动参数，默认 4 MiB，可配置 1 字节至 64 MiB，0 选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf 请求字段 15 与响应字段 9–12 保留兼容，旧字段不变。
 

@@ -2,7 +2,9 @@ package fetchservice
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
+	"github.com/FastTLS/fastls-rpc/internal/h3config"
 	"maps"
 	"net/http"
 
@@ -15,6 +17,8 @@ const defaultTimeoutSeconds = 30
 
 // Params is the transport-independent request contract shared by JSON-RPC and gRPC.
 type Params struct {
+	HTTPVersion       string
+	h3Roots           *x509.CertPool
 	IncludeBodyBase64 bool
 	// MaxResponseBytes is set by the service operator, never by a wire DTO.
 	MaxResponseBytes    int64
@@ -94,6 +98,15 @@ func BuildOptions(params Params) (fastls.Options, error) {
 		options.Proxy = params.ParentProxy
 	}
 
+	if params.HTTPVersion != "" {
+		options.UserAgent = params.UserAgent
+		conflict := params.Browser != "" || params.FingerprintSet || params.FingerprintType != "" || params.FingerprintValue != "" || params.HTTP2SettingsString != "" || params.Proxy != "" || params.ParentProxy != ""
+		if err := h3config.Apply(&options, params.HTTPVersion, params.URL, conflict, params.h3Roots); err != nil {
+			return fastls.Options{}, &ConfigError{err: err}
+		}
+		return options, nil
+	}
+
 	var ja3, ja4r string
 	if params.FingerprintSet || params.FingerprintType != "" || params.FingerprintValue != "" {
 		if params.FingerprintType == "" || params.FingerprintValue == "" {
@@ -144,10 +157,10 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 	ctx, cancel := responsecontract.RequestContext(ctx, options.Timeout)
 	defer cancel()
 	response, requestErr := client.DoContext(ctx, params.URL, options, method)
+	defer response.Client.CloseIdleConnections()
 	if response.Body != nil {
 		defer response.Body.Close()
 	}
-	defer response.Client.CloseIdleConnections()
 	if requestErr != nil {
 		code, phase := responsecontract.Code(requestErr, "request_error")
 		return Result{Status: response.Status, Protocol: response.Protocol, FinalURL: response.FinalURL, Error: responsecontract.ErrorMessage(requestErr), ErrorCode: code, TimeoutPhase: phase}, nil

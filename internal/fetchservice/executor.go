@@ -2,8 +2,10 @@ package fetchservice
 
 import (
 	"context"
+	"crypto/x509"
 	fastls "github.com/FastTLS/fastls"
 	"github.com/FastTLS/fastls-rpc/internal/audit"
+	"github.com/FastTLS/fastls-rpc/internal/h3config"
 	"github.com/FastTLS/fastls-rpc/internal/responsecontract"
 	"github.com/FastTLS/fastls-rpc/internal/servicepolicy"
 )
@@ -11,14 +13,16 @@ import (
 type Limits = responsecontract.Limits
 
 type Config struct {
+	H3CAFile          string
 	Limits            Limits
 	AddressPolicyFile string
 }
 
 // Executor owns a per-server budget shared by all requests to that server.
 type Executor struct {
-	client fastls.Fastls
-	guard  *responsecontract.Guard
+	h3Roots *x509.CertPool
+	client  fastls.Fastls
+	guard   *responsecontract.Guard
 }
 
 func NewExecutor(limits Limits) (*Executor, error) {
@@ -34,7 +38,11 @@ func NewExecutorWithConfig(config Config) (*Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{client: client, guard: guard}, nil
+	roots, err := h3config.LoadRoots(config.H3CAFile)
+	if err != nil {
+		return nil, err
+	}
+	return &Executor{client: client, guard: guard, h3Roots: roots}, nil
 }
 
 func (e *Executor) RequestMaximum() int64 { return e.guard.RequestMaximum() }
@@ -54,5 +62,6 @@ func (e *Executor) Fetch(ctx context.Context, params Params) (result Result, fai
 	}
 	defer release()
 	params.MaxResponseBytes = e.guard.Maximum()
+	params.h3Roots = e.h3Roots
 	return Fetch(ctx, e.client, params)
 }

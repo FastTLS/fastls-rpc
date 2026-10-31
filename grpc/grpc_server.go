@@ -110,6 +110,7 @@ func (s *GRPCServer) Fetch(ctx context.Context, req *pb.FetchRequest) (*pb.Fetch
 	}
 	result, err := s.executor.Fetch(ctx, fetchservice.Params{
 		IncludeBodyBase64: req.IncludeBodyBase64,
+		HTTPVersion:       req.HttpVersion,
 		URL:               req.Url, Method: req.Method, Headers: headers, Trailers: trailers, Body: req.Body,
 		Proxy: req.Proxy, ParentProxy: req.ParentProxy, Timeout: int(req.Timeout),
 		DisableRedirect: req.DisableRedirect, UserAgent: req.UserAgent,
@@ -148,6 +149,7 @@ func main() {
 		requestMaximum int64
 		inflight       int
 		policyFile     string
+		h3CAFile       string
 		auditConfig    audit.Config
 		ingressConfig  grpcIngressConfig
 	)
@@ -158,6 +160,7 @@ func main() {
 	flag.Int64Var(&maximum, "max-response-bytes", 0, "Maximum wire and decoded response bytes; 0 is unlimited")
 	flag.Int64Var(&requestMaximum, "max-request-bytes", 4<<20, "Maximum decompressed protobuf request bytes (1..64 MiB); 0 selects 4 MiB")
 	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
+	flag.StringVar(&h3CAFile, "h3-ca-file", "", "Trusted PEM roots for explicit H3 only; empty uses system roots")
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 	ingressConfig.bindFlags(flag.CommandLine)
 	auditConfig.BindFlags(flag.CommandLine)
@@ -189,7 +192,7 @@ func main() {
 
 	if err := audit.Run(auditConfig, func(sink *audit.Sink) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
-		grpcServer, err := NewGRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile})
+		grpcServer, err := NewGRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile, H3CAFile: h3CAFile})
 		if err != nil {
 			return err
 		}

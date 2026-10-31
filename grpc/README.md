@@ -26,7 +26,7 @@ grpc/
 
 ### 安装依赖
 
-普通构建只需在仓库根目录执行 `go mod download`。只有修改 `.proto` 时才需要 protoc 33.2、`protoc-gen-go` v1.36.11 和 `protoc-gen-go-grpc` v1.6.0。
+普通构建只需在仓库根目录执行 `go mod download`。只有修改 `.proto` 时才需要 protoc 31.1（Python bundled compiler 6.31.1）与 `protoc-gen-go` v1.36.11 生成请求消息；服务方法未变，原 `protoc-gen-go-grpc` v1.6.0 / protoc 33.2 服务 stub 保留。
 
 ### 生成代码
 
@@ -122,3 +122,6 @@ node nodejs_client.js
 - [Fetch服务](https://github.com/FastTLS/fastls-fetch) - HTTP请求服务
 - [MITM代理服务](https://github.com/FastTLS/fastls-mitm) - 中间人代理服务
 
+
+
+`FetchRequest.http_version` 为新增字符串字段 16；`h3` 显式要求出站 HTTPS/QUIC。启动配置 `-h3-ca-file` 固定私有 CA，客户端不能关闭校验。冲突与错误通道见 [H3 契约](../H3.md)。

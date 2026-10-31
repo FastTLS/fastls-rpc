@@ -51,6 +51,7 @@ type RPCError struct {
 
 // FetchParams 请求参数
 type FetchParams struct {
+	HTTPVersion         string            `json:"http_version"`
 	IncludeBodyBase64   bool              `json:"include_body_base64"`
 	URL                 string            `json:"url" binding:"required"`
 	Method              string            `json:"method"`
@@ -208,6 +209,7 @@ func (s *RPCServer) handleFetch(ctx context.Context, params json.RawMessage) (in
 	}
 	result, err := s.executor.Fetch(ctx, fetchservice.Params{
 		IncludeBodyBase64: p.IncludeBodyBase64,
+		HTTPVersion:       p.HTTPVersion,
 		URL:               p.URL, Method: p.Method, Headers: p.Headers, Trailers: p.Trailers, Body: p.Body,
 		Proxy: p.Proxy, ParentProxy: p.ParentProxy, Timeout: p.Timeout,
 		DisableRedirect: p.DisableRedirect, UserAgent: p.UserAgent,
@@ -234,6 +236,7 @@ func main() {
 		requestMaximum int64
 		inflight       int
 		policyFile     string
+		h3CAFile       string
 		auditConfig    audit.Config
 		ingressConfig  ingress.HTTPConfig
 	)
@@ -244,6 +247,7 @@ func main() {
 	flag.Int64Var(&maximum, "max-response-bytes", 0, "Maximum wire and decoded response bytes; 0 is unlimited")
 	flag.Int64Var(&requestMaximum, "max-request-bytes", 4<<20, "Maximum complete JSON request bytes (1..64 MiB); 0 selects 4 MiB")
 	flag.IntVar(&inflight, "max-inflight", 0, "Maximum active fetch calls; 0 is unlimited")
+	flag.StringVar(&h3CAFile, "h3-ca-file", "", "Trusted PEM roots for explicit H3 only; empty uses system roots")
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 	ingressConfig.BindFlags(flag.CommandLine)
 	auditConfig.BindFlags(flag.CommandLine)
@@ -278,7 +282,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 
 		// 创建RPC服务器
-		rpcServer, err := NewRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile})
+		rpcServer, err := NewRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile, H3CAFile: h3CAFile})
 		if err != nil {
 			return err
 		}

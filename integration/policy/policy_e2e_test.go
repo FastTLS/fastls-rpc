@@ -191,7 +191,7 @@ func failedStartup(t *testing.T, binary, path, want string) {
 	}
 }
 
-func start(t *testing.T, kind, binary string, config any) (func(map[string]any) result, *testprocess.Process) {
+func start(t *testing.T, kind, binary string, config any, extra ...string) (func(map[string]any) result, *testprocess.Process) {
 	t.Helper()
 	address := testprocess.ReserveLoopbackAddress(t)
 	path := policyFile(t, config)
@@ -199,6 +199,7 @@ func start(t *testing.T, kind, binary string, config any) (func(map[string]any) 
 	if config != nil {
 		arguments = append(arguments, "-address-policy", path)
 	}
+	arguments = append(arguments, extra...)
 	process := testprocess.Start(t, binary, arguments...)
 	var client pb.FastlsServiceClient
 	if kind == "grpc" {
