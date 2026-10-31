@@ -12,30 +12,13 @@ CURRENT = '1.26.10'
 NEXT = '1.27.3'
 
 
-def native_run_valid(run, jobs):
-    matrix = {f'{platform} / Go {version}' for platform in ('ubuntu-24.04', 'windows-2022', 'macos-15') for version in (CURRENT, NEXT)}
-    names = {j['name'] for j in jobs if j.get('conclusion') == 'success'}
-    return (run.get('conclusion') == 'success' and run.get('event') == 'push' and run.get('head_branch') == 'main'
-            and matrix <= names and 'Dependency policy' in names and 'Accepted validation plan' in names
-            and any(name.startswith('Race, coverage and CLI smoke') for name in names)
-            and all(j.get('conclusion') == 'success' for j in jobs))
-
-
-def native_recipe(text):
-    # A prior success is reusable only for unchanged native commands, actions,
-    # environments, matrix expansion and dependencies. Ignore just the job-level
-    # selection condition, whose new coordination branch is unit tested.
-    selected = []
-    for name, end in (('dependency-policy', 'test'), ('test', 'quality'), ('quality', 'accepted')):
-        part = text.split('  '+name+':\n', 1)[1].split('  '+end+':\n', 1)[0]
-        selected.append('\n'.join(line for line in part.splitlines() if not line.startswith('    if:')))
-    selected.append(text.split('\nenv:\n', 1)[1].split('\njobs:', 1)[0])
-    return hashlib.sha256('\n'.join(selected).encode()).hexdigest()
+from validation_inputs import (CURRENT, NEXT, TOOLS, CONTRACTS, CI, BUILD,
+    documentation, native_recipe, full_native as native_run_valid, find_native, docs_are_inputs)
 
 
 def native_baseline():
     repo, token = os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GH_TOKEN')
-    if not repo or not token:
+    if repo not in ('FastTLS/fastls-fetch', 'FastTLS/fastls-rpc', 'FastTLS/fastls-mitm') or not token:
         return None
     def api(path):
         request = urllib.request.Request('https://api.github.com/repos/'+repo+path,
@@ -43,42 +26,17 @@ def native_baseline():
         with urllib.request.urlopen(request, timeout=15) as response:
             return json.load(response)
     try:
-        current = native_recipe(Path('.github/workflows/ci.yml').read_text())
-        runs = api('/actions/workflows/ci.yml/runs?status=success&event=push&branch=main&per_page=20')['workflow_runs']
-        for run in runs:
-            sha = run['head_sha']
-            if not re.fullmatch('[0-9a-f]{40}', sha):
-                continue
-            if subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], capture_output=True).returncode:
-                continue
-            changed = subprocess.check_output(['git', 'diff', '--name-only', sha, 'HEAD'], text=True).splitlines()
-            if choose('push', 'refs/heads/main', 'auto', changed)['mode'] != 'coordination':
-                continue
-            previous = subprocess.check_output(['git', 'show', sha+':.github/workflows/ci.yml'], text=True)
-            if native_recipe(previous) != current:
-                continue
-            jobs = api('/actions/runs/'+str(run['id'])+'/jobs?per_page=100')['jobs']
-            if len(jobs) < 100 and native_run_valid(run, jobs):
-                return dict(run_id=run['id'], sha=sha, recipe_sha256=current, verified=True)
+        return find_native(Path.cwd(), subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), api, repo)
     except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError):
         return None
-    return None
 
 
 def choose(event, ref, requested, paths):
     if requested not in ('auto', 'quick', 'candidate'):
         raise ValueError('unknown validation mode')
     tag = ref.startswith('refs/tags/')
-    docs = paths is not None and bool(paths) and all(
-        p.endswith(('.md', '.rst', '.txt')) or p in ('LICENSE', 'NOTICE') for p in paths)
-    coordination_files = {
-        'scripts/ci_plan.py', 'scripts/test_ci_plan.py',
-        '.github/workflows/ci.yml', '.github/workflows/workspace-integration.yml',
-        '.github/workflows/address-policy-integration.yml',
-        'integration/policy/policy_e2e_test.go', 'integration/policy/mitm_gateway_e2e_test.go',
-    }
-    def documentation(path):
-        return path.endswith(('.md', '.rst', '.txt')) or path in ('LICENSE', 'NOTICE')
+    docs = paths is not None and bool(paths) and all(documentation(p) for p in paths)
+    coordination_files = TOOLS | CONTRACTS | {CI, BUILD}
     coordination = paths is not None and bool(paths) and any(p in coordination_files for p in paths) and all(
         p in coordination_files or documentation(p) for p in paths)
     if coordination:
@@ -135,11 +93,13 @@ def main():
     if not base or set(base) == {'0'}:
         base = 'HEAD^'
     try:
-        paths = subprocess.check_output(['git', 'diff', '--name-only', base, head or 'HEAD'], text=True).splitlines()
+        paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', base, head or 'HEAD'], text=True).splitlines()
     except subprocess.CalledProcessError:
         paths = None
     plan = choose(os.environ['GITHUB_EVENT_NAME'], os.environ['GITHUB_REF'],
                   event.get('inputs', {}).get('validation', 'auto'), paths)
+    if plan['mode'] == 'docs' and docs_are_inputs(Path.cwd(), head or 'HEAD'):
+        plan = choose(os.environ['GITHUB_EVENT_NAME'], os.environ['GITHUB_REF'], 'candidate', paths)
     if plan['mode'] == 'coordination':
         proof = native_baseline()
         if proof:

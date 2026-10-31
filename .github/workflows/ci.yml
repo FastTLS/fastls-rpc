@@ -45,6 +45,10 @@ jobs:
         run: python scripts/ci_plan.py
       - name: Validate release evidence rejection gates
         run: python -m unittest discover -s scripts -p test_release_gate.py -v
+      - name: Test immutable input and recovery boundaries
+        run: python -m unittest discover -s scripts -p "test_*inputs.py" -v
+      - name: Test release-byte resumption and evidence selection
+        run: python -m unittest discover -s scripts -p test_release_download.py -v
       - name: Check patch whitespace
         run: git diff --check HEAD^ HEAD
 

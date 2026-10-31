@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import zipfile
+from release_download import download
 
 MODULES = {
     'github.com/FastTLS/fastls':'v0.1.3-0.20261030152832-0dc4eea0f32e',
@@ -38,9 +39,13 @@ def main():
         repository='FastTLS/'+name
         ext='.zip' if target.startswith('windows-') else '.tar.gz'
         archive=name+'-'+version+'-'+target+ext
-        run('gh','release','download',version,'--repo',repository,'--dir',str(directory),'--pattern',archive,'--pattern','SHA256SUMS','--pattern','provenance.sigstore.json')
         release=json.loads(run('gh','api','repos/'+repository+'/releases/tags/'+version))
         asset=next(a for a in release['assets'] if a['name']==archive)
+        if not re.fullmatch('sha256:[0-9a-f]{64}',asset.get('digest','')):
+            raise SystemExit('release metadata lacks pinned SHA256')
+        transfer=download(asset['browser_download_url'],directory/archive,asset['size'],asset['digest'][7:])
+        (directory/'download.json').write_text(json.dumps(transfer,indent=2)+'\n',encoding='utf-8')
+        run('gh','release','download',version,'--repo',repository,'--dir',str(directory),'--pattern','SHA256SUMS','--pattern','provenance.sigstore.json')
         digest=hashlib.sha256((directory/archive).read_bytes()).hexdigest()
         expected=dict((line.split()[1].lstrip('*'),line.split()[0]) for line in (directory/'SHA256SUMS').read_text().splitlines())
         if expected.get(archive)!=digest or asset.get('digest')!='sha256:'+digest:

@@ -47,7 +47,9 @@ class ValidationPlan(unittest.TestCase):
         with self.assertRaises(ValueError): choose('push', 'refs/heads/dev', 'unknown', ['x.go'])
 
     def test_tagged_coordination_changes_reuse_native_inputs(self):
-        paths=['integration/policy/policy_e2e_test.go', 'scripts/ci_plan.py', '.github/workflows/ci.yml']
+        paths=['scripts/ci_plan.py', '.github/workflows/ci.yml']
+        if (Path(__file__).resolve().parents[1]/'integration/policy/policy_e2e_test.go').exists():
+            paths.append('integration/policy/policy_e2e_test.go')
         plan=choose('push', 'refs/heads/main', 'auto', paths)
         self.assertEqual(plan['mode'], 'coordination')
         self.assertFalse(plan['quality'])
@@ -65,7 +67,9 @@ class ValidationPlan(unittest.TestCase):
         self.assertEqual(choose('push','refs/tags/v0.1.2','auto',paths)['mode'],'candidate')
 
     def test_workspace_paths_ignore_documentation_and_keep_protocol_inputs(self):
-        text=(Path(__file__).resolve().parents[1]/'.github/workflows/workspace-integration.yml').read_text()
+        path=Path(__file__).resolve().parents[1]/'.github/workflows/workspace-integration.yml'
+        if not path.exists(): self.skipTest('RPC-only workflow')
+        text=path.read_text()
         for event,end in [('push','pull_request'),('pull_request','workflow_dispatch')]:
             block=text.split('  '+event+':',1)[1].split('  '+end+':',1)[0]
             patterns=re.findall(r"^      - '([^']+)'",block,re.M)
@@ -88,9 +92,9 @@ class ValidationPlan(unittest.TestCase):
         with self.assertRaises(ValueError): gate(dict(mode='coordination', quality=False), {})
 
     def test_reuse_requires_all_native_platforms_and_quality(self):
-        run=dict(conclusion='success', event='push', head_branch='main')
+        run=dict(conclusion='success', event='push', head_branch='main', head_sha='c'*40, status='completed', path='.github/workflows/ci.yml')
         jobs=[dict(name=f'{os} / Go {go}', conclusion='success') for os in ('ubuntu-24.04','windows-2022','macos-15') for go in (CURRENT,NEXT)]
-        jobs += [dict(name=name,conclusion='success') for name in ('Dependency policy','Accepted validation plan','Race, coverage and CLI smoke tests')]
+        jobs += [dict(name=name,conclusion='success') for name in ('plan','Dependency policy','Accepted validation plan','Race, coverage and CLI smoke tests')]
         self.assertTrue(native_run_valid(run,jobs))
         for i in range(len(jobs)):
             self.assertFalse(native_run_valid(run,jobs[:i]+jobs[i+1:]))
@@ -102,7 +106,7 @@ class ValidationPlan(unittest.TestCase):
     def test_native_recipe_rejects_changed_execution_inputs(self):
         workflow=(Path(__file__).resolve().parents[1]/'.github/workflows/ci.yml').read_text()
         expected=native_recipe(workflow)
-        for old,new in [('run: go test ./...', 'run: go test -short ./...'),
+        for old,new in [('go test ', 'go test -short '),
                         ("GOWORK: 'off'", "GOWORK: 'auto'"),
                         ('fail-fast: false','fail-fast: true'),
                         ("go-version: '1.26.10'", "go-version: '1.27.3'")]:

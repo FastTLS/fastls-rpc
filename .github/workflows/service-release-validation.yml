@@ -20,6 +20,14 @@ on:
         description: Full released RPC source SHA (may differ from smoke tooling)
         required: true
         type: string
+      resource_check:
+        description: Run five-minute resources only for changed resource mechanisms or explicit acceptance
+        type: boolean
+        default: false
+      primary_only:
+        description: Tool-only validation of unchanged releases on Linux and Windows
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,14 +39,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {runner: ubuntu-24.04, target: linux-amd64}
-          - {runner: ubuntu-24.04-arm, target: linux-arm64}
-          - {runner: windows-2022, target: windows-amd64}
-          - {runner: windows-11-arm, target: windows-arm64}
-          - {runner: macos-15-intel, target: darwin-amd64}
-          - {runner: macos-15, target: darwin-arm64}
+      matrix: ${{ fromJSON(inputs.primary_only && '{"include":[{"runner":"ubuntu-24.04","target":"linux-amd64"},{"runner":"windows-2022","target":"windows-amd64"}]}' || '{"include":[{"runner":"ubuntu-24.04","target":"linux-amd64"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64"},{"runner":"windows-2022","target":"windows-amd64"},{"runner":"windows-11-arm","target":"windows-arm64"},{"runner":"macos-15-intel","target":"darwin-amd64"},{"runner":"macos-15","target":"darwin-arm64"}]}') }}
     runs-on: ${{ matrix.runner }}
     env:
       GOWORK: 'off'
@@ -84,14 +85,18 @@ jobs:
           set -euo pipefail
           go test -v -count=1 -tags policy_e2e -run '^(TestServiceAddressPolicyAcrossEntries|TestMITMGatewayEnforcesPolicyForThreeRequestServices|TestMITMServiceUnspecifiedTargetsNeverDial)$' -timeout 240s ./integration/policy 2>&1 | tee "${RELEASE_EVIDENCE}/installed-policy.log"
       - name: Five-minute installed-service resource and recovery check
-        if: matrix.target == 'linux-amd64'
+        if: inputs.resource_check && matrix.target == 'linux-amd64'
         working-directory: workspace/fastls-rpc
         run: python scripts/service_resource_smoke.py
+      - name: Stage compact verification evidence
+        if: always()
+        shell: bash
+        run: python workspace/fastls-rpc/scripts/evidence_archive.py "${RUNNER_TEMP}/service-release-evidence" "${RUNNER_TEMP}/service-release-compact"
       - name: Preserve installed artifact evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: installed-services-${{ matrix.target }}
-          path: ${{ runner.temp }}/service-release-evidence/
+          name: installed-services-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/service-release-compact/
           retention-days: 14
           if-no-files-found: warn

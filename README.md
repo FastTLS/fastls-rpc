@@ -8,7 +8,7 @@ FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种�
 
 v0.1.2 的 JSON-RPC/gRPC 提供完整多值响应头、按需附带的原始正文 Base64、错误分类和可选响应字节/并发上限；另提供 max-request-bytes 启动参数，默认 4 MiB，可配置 1 字节至 64 MiB，0 选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf 请求字段 15 与响应字段 9–12 保留兼容，旧字段不变。
 
-S1 开发源码新增 [接入资源限额](INGRESS.md)：TCP 总名额、HTTP 正文/gRPC 消息解码之前的名额、头部和时限配置，以及每连接 HTTP/2 流限制；与原 fetch 执行名额分别计数，默认兼容现有行为。
+v0.1.2 包含 [接入资源限额](INGRESS.md)：TCP 总名额、HTTP 正文/gRPC 消息解码之前的名额、头部和时限配置，以及每连接 HTTP/2 流限制；与原 fetch 执行名额分别计数，默认兼容现有行为。
 
 [使用文档](https://fasttls.github.io/ecosystem/) · [下载发布包](https://github.com/FastTLS/fastls-rpc/releases)
 
@@ -140,8 +140,8 @@ FastTLS 自有代码采用 [Apache-2.0](LICENSE)，见 [NOTICE](NOTICE)。依赖
 
 仅在拥有权限的系统、数据和网络上使用，并遵守适用法律、服务条款及隐私要求。软件按许可证约定以“现状”提供，不承诺可用性、特定用途适用性、第三方服务放行、匿名性或与真实浏览器完全一致。浏览器名称和版本用于描述配置，不表示获得相应厂商认证或背书。部署方负责访问控制、密钥和个人信息保护、请求限额及数据备份；担保排除与责任限制以随附许可证及适用法律为准。本说明不改变许可证授予的权利或新增许可限制。
 
-## Development audit
+## Optional audit (released since v0.1.1)
 
-[Optional audit events and limits](AUDIT.md): disabled by default, with fixed redacted fields and bounded drain. This is a development candidate.
+[Optional audit events and limits](AUDIT.md): disabled by default, with fixed redacted fields and bounded drain. Available in service v0.1.1 and v0.1.2; auditing remains opt-in.
 
-发行构建先核对同一完整提交在 main 的成功 CI；RPC 同时要求完整服务联调成功。缺失、失败、取消或未获准跳过均阻止构建。main 保留常规验收，开发归档改为手动生成，正式标签只构建一次六平台发行字节；标签阶段复用精确候选证据，另验摘要、来源与真实安装。
+发行门禁接受同一完整提交的成功候选，或独立重新核验过的可信 main 祖先证明。复用要求源码、模块、生成输入、原生命令、工具链及平台配置一致，全部必需任务成功；未知差异、缺失、失败、取消和任意跳过均阻止签发。RPC 的跨仓契约单独检查固定引用、协议测试与执行配置，不随普通 Go 证明自动豁免。归档继续按实际生产提交构建、记录 vcs.revision 并签名，不将旧字节改标为新提交。main 不自动重复生成开发归档，正式标签每个平台只构建一次。
