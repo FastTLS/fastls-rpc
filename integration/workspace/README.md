@@ -17,7 +17,7 @@ fastls-mitm-ftransport/
 在 RPC 仓库中运行：
 
 ```bash
-GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace
+GOWORK=off go test -count=1 -tags workspace_e2e ./integration/workspace
 ```
 
 测试只监听环回地址，目标、CA、二进制和进程日志都位于测试临时目录，不访问公网。

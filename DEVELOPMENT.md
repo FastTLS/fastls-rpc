@@ -38,7 +38,7 @@ JSON-RPC HTTP入口变更必须覆盖CORS凭据语义、默认4MiB及可配置ma
 
 当同级目录存在 `fastls-fetch-ftransport` 与 `fastls-mitm-ftransport` 时，可运行 `GOWORK=off go test -count=3 -tags workspace_e2e ./integration/workspace`。该测试先校验三仓共享依赖版本一致且没有 `replace`，再构建四个真实服务进程，并验证 Fetch、JSON-RPC、gRPC 都能经 MITM 访问同一个环回 HTTPS 目标；负向用例验证无效配置、4 MiB 请求边界、上级代理拒绝 CONNECT 时禁止静默直连、服务超时和 gRPC 调用取消向目标传播，以及失败后的服务健康状态。Linux/macOS 还会验证四个 CLI 收到中断信号后在时限内退出并关闭监听端口；Windows 不使用强制终止冒充信号优雅退出。普通单仓测试矩阵不启用此标签。组合测试使用 HTTPS，因为 `ftransport` 的上游代理路径使用 CONNECT，而 MITM 按 TLS 隧道处理 CONNECT 目标。
 
-`.github/workflows/workspace-integration.yml` 是跨仓协调门禁：RPC 拉取请求和主分支运行使用另外两个仓库的 `main`，手动运行可以固定 Fetch、MITM 的分支、标签或提交，RPC ref 由工作流启动位置决定。结果 artifact 必须包含三仓精确提交号、模块依赖清单和联调日志；候选验证不得省略 ref 记录。完整说明见 `integration/workspace/README.md`。
+`.github/workflows/workspace-integration.yml` 是跨仓协调门禁：RPC 拉取请求和主分支运行使用工作流中固定的另外两个仓库完整提交，手动运行可以固定 Fetch、MITM 的分支、标签或提交，RPC ref 由工作流启动位置决定。结果 artifact 必须包含三仓精确提交号、模块依赖清单和联调日志；候选验证不得省略 ref 记录。完整说明见 `integration/workspace/README.md`。
 
 ## Protobuf 变更
 
@@ -69,8 +69,12 @@ python -m grpc_tools.protoc -I grpc/proto \
 
 ## 开发产物
 
-合入 `main` 或手动运行 `Development artifacts` 后，工作流生成临时开发产物。推送受审的 `v*` 标签时，同一流程在所有验证成功后创建正式 GitHub Release，且不向其他渠道发布。详见 [ARTIFACTS.md](./ARTIFACTS.md)。
+手动运行 `Development artifacts` 后，工作流生成临时开发产物。推送受审的 `v*` 标签时，同一流程在所有验证成功后创建正式 GitHub Release，且不向其他渠道发布。详见 [ARTIFACTS.md](./ARTIFACTS.md)。
 
 ## 文档同步
 
 修改请求字段时，同时更新 `.proto`（适用时）、JSON-RPC 文档、gRPC 文档和至少一个客户端示例。修改指纹选择范围时同步两个服务的帮助输出和文档。
+
+正式归档消费验证使用 `Installed service releases` 手动工作流：指定三个发行源码完整 SHA 和版本，六个平台分别校验官方摘要、签名工作流/提交/标签、内嵌模块及版本/帮助，再运行下载后的 Fetch、JSON-RPC、gRPC、MITM 真实入口。测试工具提交与已发行 RPC 源码分别记录；缺失产物禁止回退到源码构建。Linux amd64 合并执行一轮五分钟资源/取消恢复检查，原始证据随工作流归档。
+
+main 仍保留分级验收，普通更新不自动交叉打包开发归档。签发前要求同一完整提交在 main 的完整候选 CI 成功；RPC 还要求跨仓联调成功。只复用精确输入证据，正式标签一次构建各平台发行物，缺失/失败/取消或未获准跳过不能签发。纯文档同步不重跑 Go 平台矩阵；发行源码及其原始证明保持不变。
