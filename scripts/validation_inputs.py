@@ -7,7 +7,7 @@ import subprocess
 
 CURRENT = '1.26.10'
 NEXT = '1.27.3'
-DOCS = {'H3.md', 'README.md', 'DEVELOPMENT.md', 'ADDRESS_POLICY.md', 'AUDIT.md',
+DOCS = {'SHUTDOWN.md', 'H3.md', 'README.md', 'DEVELOPMENT.md', 'ADDRESS_POLICY.md', 'AUDIT.md',
         'ARTIFACTS.md', 'INGRESS.md', 'RESPONSE_CONTRACT.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md'}
 TOOLS = {'scripts/ci_plan.py', 'scripts/test_ci_plan.py', 'scripts/release_gate.py',
          'scripts/test_release_gate.py', 'scripts/validation_inputs.py',

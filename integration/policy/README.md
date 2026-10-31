@@ -30,3 +30,8 @@ MITM 仓库另外运行 `-tags mitm_policy_e2e ./...` 和对应竞态检查。�
 ## 显式 H3 服务验收
 
 `TestServiceExplicitH3AcrossEntries` 验证三入口真实 H3、有/无策略、证书与固定 CA、冲突、UDP 黑洞、重定向不降级、超时/取消与名额恢复。仅 Linux 正式安装验收设置 `FASTLS_H3_RESOURCE_SECONDS=300` 执行 `TestServiceH3ResourceRecovery`；其它任务明确跳过此独立资源观察，不能冒充已执行。阈值为暖机 15–45 秒与最后一分钟平均 RSS 增长最多 64 MiB，FD 峰值增长最多 24。
+
+
+## 协作停机验收
+
+`TestServiceCooperativeShutdownAcrossEntries` 对三个实际进程验证 H1/H2/H3 的短请求排空、协作取消、上游结束、审计、默认兼容及非零强制失败；Windows 使用真实独立控制台 Ctrl+Break，Unix 覆盖 SIGINT/SIGTERM。`TestServiceLifecycleResourceRecovery` 仅设置 `FASTLS_LIFECYCLE_RESOURCE_SECONDS=300` 的 Linux 安装任务执行：一次五分钟混合协议完成/取消和 RSS/FD 观察后追加三入口零退出协作停机。负载与总时长分别记录于 lifecycle-resource.json。原 H3-only 检查保留手动选择，本批不再选它执行第二次五分钟观察。

@@ -1,10 +1,12 @@
 # fastls-rpc
 
+新增 [可选协作停机](SHUTDOWN.md)：`-shutdown-cancel-after` 在固定总期限内取消长请求并核实回收；默认关闭，强制退出仍报告失败。
+
 [English documentation](https://fasttls.github.io/en/ecosystem/fastls-rpc)
 
 FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种接入方式。两种服务共享相同的浏览器/JA3/JA4R 指纹解析，并通过 `fastls` + `ftransport` 发起请求。
 
-> 当前功能版本：`v0.2.0`；正式二进制以 [GitHub Releases](https://github.com/FastTLS/fastls-rpc/releases) 为准。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
+> 当前功能版本：`v0.3.0`；正式二进制以 [GitHub Releases](https://github.com/FastTLS/fastls-rpc/releases) 为准。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
 
 新增 [显式出站 H3](H3.md)：三入口统一 `http_version=h3`、证书校验、可信启动 CA 与地址策略组合；缺省 H1/H2 保持。gRPC 请求新增字段 16，其余字段不变。
 

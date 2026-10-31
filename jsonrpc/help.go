@@ -3,6 +3,7 @@ package main
 import "fmt"
 
 func printHelp() {
+	fmt.Println("Cooperative shutdown: -shutdown-cancel-after 1s (default 0 disables; 0 < interval < 5s); drain/cancel/cleanup/audit share 5s; forced fallback remains nonzero")
 	fmt.Println("Explicit outbound H3: http_version= h3 (HTTPS only); -h3-ca-file PATH supplies trusted startup roots; no browser fingerprints, proxies or request trailers")
 	fmt.Println("Audit (development): -audit-file PATH -audit-queue 1024 -audit-drain-timeout 5s; disabled without a file")
 

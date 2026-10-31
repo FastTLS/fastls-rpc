@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/FastTLS/fastls-rpc/internal/audit"
+	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"strings"
 	"time"
 
@@ -63,10 +64,11 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 		options = append(options, grpc.ConnectionTimeout(config.ConnectionTimeout))
 	}
 	admissionEnabled := config.MaxAdmittedRequests > 0 || config.RPCTimeout > 0
-	if admissionEnabled || s.audit != nil {
-		if admissionEnabled {
+	if admissionEnabled || s.audit != nil || s.shutdown.Enabled() {
+		if admissionEnabled || s.shutdown.Enabled() {
 			options = append(options, grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 				defer releaseAdmission(ctx)
+				defer shutdown.Release(ctx)
 				response, err := handler(ctx, request)
 				if ctx.Err() != nil {
 					return nil, status.FromContextError(ctx.Err()).Err()
@@ -75,11 +77,19 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 			}), grpc.StatsHandler(admissionStats{}))
 		}
 		options = append(options, grpc.InTapHandle(func(ctx context.Context, info *tap.Info) (context.Context, error) {
+			if s.shutdown.Enabled() {
+				var err error
+				ctx, _, err = s.shutdown.Attach(ctx)
+				if err != nil {
+					return ctx, status.Error(codes.Unavailable, "service stopping")
+				}
+			}
 			ctx, operation := (auditRPCStats{sink: s.audit}).begin(ctx, info.FullMethodName)
 			original := ctx
 			release, err := gate.Acquire(ctx)
 			if err != nil {
 				stopAuditFallback(ctx)
+				shutdown.Release(ctx)
 				if ctx.Err() != nil {
 					operation.Done(ctx, 0, status.Code(status.FromContextError(ctx.Err()).Err()).String())
 					return ctx, status.FromContextError(ctx.Err()).Err()
@@ -108,6 +118,7 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 				cancel()
 				// Unknown methods never reach a unary handler or stats.End.
 				if !knownUnary {
+					shutdown.Release(ctx)
 					release()
 				}
 			})
@@ -131,6 +142,7 @@ func (admissionStats) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.C
 func (admissionStats) HandleRPC(ctx context.Context, event stats.RPCStats) {
 	if _, ok := event.(*stats.End); ok {
 		releaseAdmission(ctx)
+		shutdown.Release(ctx)
 	}
 }
 func (admissionStats) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context { return ctx }

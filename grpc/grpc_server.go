@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"github.com/FastTLS/fastls-rpc/internal/audit"
+	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"log"
 	"net"
 	"net/http"
@@ -29,6 +30,7 @@ type GRPCServer struct {
 	pb.UnimplementedFastlsServiceServer
 	executor *fetchservice.Executor
 	audit    *audit.Sink
+	shutdown *shutdown.Controller
 }
 
 // NewGRPCServer 创建新的gRPC服务器
@@ -151,6 +153,7 @@ func main() {
 		policyFile     string
 		h3CAFile       string
 		auditConfig    audit.Config
+		shutdownConfig shutdown.Config
 		ingressConfig  grpcIngressConfig
 	)
 
@@ -164,6 +167,7 @@ func main() {
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 	ingressConfig.bindFlags(flag.CommandLine)
 	auditConfig.BindFlags(flag.CommandLine)
+	shutdownConfig.BindFlags(flag.CommandLine)
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -190,13 +194,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := audit.Run(auditConfig, func(sink *audit.Sink) error {
+	owner, err := shutdown.New(shutdownConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer owner.Close()
+	if err := audit.RunWithDeadline(auditConfig, func(sink *audit.Sink) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 		grpcServer, err := NewGRPCServerWithConfig(fetchservice.Config{Limits: fetchservice.Limits{MaxRequestBytes: requestMaximum, MaxResponseBytes: maximum, MaxInflight: inflight}, AddressPolicyFile: policyFile, H3CAFile: h3CAFile})
 		if err != nil {
 			return err
 		}
 		grpcServer.audit = sink
+		grpcServer.shutdown = owner
 		server, err := grpcServer.newTransportServerWithIngress(ingressConfig)
 		if err != nil {
 			return err
@@ -216,8 +226,8 @@ func main() {
 		log.Printf("gRPC服务启动在端口 %s", lis.Addr())
 		shutdownContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stopSignals()
-		return serverlifecycle.ServeGRPC(shutdownContext, limited, server)
-	}); err != nil {
+		return serverlifecycle.ServeGRPCWithController(shutdownContext, limited, server, owner)
+	}, owner.Deadline); err != nil {
 		log.Fatal(err)
 	}
 }

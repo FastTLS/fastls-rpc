@@ -67,6 +67,7 @@ func Start(t testing.TB, binary string, arguments ...string) *Process {
 		t.Fatal(err)
 	}
 	command := exec.Command(binary, arguments...)
+	configureProcess(command)
 	command.Stdout = logFile
 	command.Stderr = logFile
 	if err := command.Start(); err != nil {
@@ -101,7 +102,7 @@ func (p *Process) Signal(signal os.Signal) error {
 	case <-p.done:
 		return os.ErrProcessDone
 	default:
-		return p.command.Process.Signal(signal)
+		return signalProcess(p.command.Process, signal)
 	}
 }
 

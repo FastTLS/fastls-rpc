@@ -238,6 +238,11 @@ func (s *Sink) Stats() Stats {
 // Run is the CLI owner: all startup/serve errors return through drain before
 // main exits. Disabled mode opens no file and starts no worker.
 func Run(c Config, serve func(*Sink) error) error {
+	return RunWithDeadline(c, serve, nil)
+}
+
+// RunWithDeadline shares a cooperative server's absolute deadline with auditing.
+func RunWithDeadline(c Config, serve func(*Sink) error, deadline func() (time.Time, bool)) error {
 	s, err := Open(c)
 	if err != nil {
 		return err
@@ -247,7 +252,13 @@ func Run(c Config, serve func(*Sink) error) error {
 	if budget == 0 {
 		budget = 5 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	end := time.Now().Add(budget)
+	if deadline != nil {
+		if shared, ok := deadline(); ok && shared.Before(end) {
+			end = shared
+		}
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), end)
 	defer cancel()
 	err = s.Close(ctx)
 	if s != nil {

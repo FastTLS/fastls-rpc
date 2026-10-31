@@ -154,7 +154,7 @@ func h3Start(t *testing.T, kind, binary string, policy any, args ...string) (fun
 	return call, process
 }
 
-func h3Peer(t *testing.T) (string, string, *atomic.Int32, *atomic.Int32) {
+func h3Peer(t *testing.T, handlers ...http.Handler) (string, string, *atomic.Int32, *atomic.Int32) {
 	t.Helper()
 	certificate := httptest.NewTLSServer(http.NotFoundHandler())
 	t.Cleanup(certificate.Close)
@@ -200,6 +200,9 @@ func h3Peer(t *testing.T) (string, string, *atomic.Int32, *atomic.Int32) {
 			w.Header().Set("X-End", "done")
 		}
 	})}
+	if len(handlers) > 0 {
+		server.Handler = handlers[0]
+	}
 	done := make(chan struct{})
 	go func() { defer close(done); _ = server.Serve(packet) }()
 	t.Cleanup(func() { server.Close(); packet.Close(); <-done })

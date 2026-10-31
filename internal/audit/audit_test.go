@@ -319,3 +319,20 @@ func TestHTTPWrapperPreservesWireTrailersAndDeadlineController(t *testing.T) {
 		t.Fatalf("wire body=%x header=%v trailer=%v err=%v", body, resp.Header, resp.Trailer, err)
 	}
 }
+
+func TestRunSharesAbsoluteShutdownDeadline(t *testing.T) {
+	path := t.TempDir() + "/audit.jsonl"
+	var operation *Operation
+	start := time.Now()
+	err := RunWithDeadline(Config{File: path, DrainTimeout: time.Second}, func(s *Sink) error {
+		_, operation = s.Begin(context.Background(), "fetch", "request", "HTTP/1.1")
+		return nil
+	}, func() (time.Time, bool) { return start.Add(30 * time.Millisecond), true })
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("lost shared deadline", err)
+	}
+	if time.Since(start) > 300*time.Millisecond {
+		t.Fatal("audit reset budget")
+	}
+	operation.Done(context.Background(), 200, "")
+}

@@ -11,6 +11,9 @@ import (
 
 	"github.com/FastTLS/fastls-rpc/internal/ingress"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type observedHandshakeListener struct {
@@ -213,5 +216,46 @@ func TestServeHTTPForcesCloseAfterTimeout(t *testing.T) {
 	case <-requestDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("HTTP client remained blocked after forced shutdown")
+	}
+}
+
+func TestForcedGRPCDoesNotWaitForUncooperativeHandler(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		close(started)
+		<-release
+		return handler(ctx, request)
+	}))
+	healthpb.RegisterHealthServer(server, health.NewServer())
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(listener)
+	defer func() { close(release); server.Stop() }()
+	connection, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	go func() {
+		_, _ = healthpb.NewHealthClient(connection).Check(context.Background(), &healthpb.HealthCheckRequest{})
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("handler not started")
+	}
+	done := make(chan error, 1)
+	go func() { done <- stopGRPCWithConnections(server, listener, 30*time.Millisecond) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("forced cleanup must fail")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("force path waited for handler")
 	}
 }

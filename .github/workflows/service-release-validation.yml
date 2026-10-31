@@ -6,7 +6,7 @@ on:
       release_version:
         description: Exact service release tag
         required: true
-        default: v0.2.0
+        default: v0.3.0
         type: string
       fetch_ref:
         description: Full released Fetch source SHA
@@ -88,16 +88,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v -count=1 -tags policy_e2e -run '^(TestServiceAddressPolicyAcrossEntries|TestMITMGatewayEnforcesPolicyForThreeRequestServices|TestMITMServiceUnspecifiedTargetsNeverDial|TestServiceExplicitH3AcrossEntries)$' -timeout 240s ./integration/policy 2>&1 | tee "${RELEASE_EVIDENCE}/installed-policy.log"
-      - name: Five-minute installed H3 service resource and recovery check
+          go test -v -count=1 -tags policy_e2e -run '^(TestServiceAddressPolicyAcrossEntries|TestMITMGatewayEnforcesPolicyForThreeRequestServices|TestMITMServiceUnspecifiedTargetsNeverDial|TestServiceExplicitH3AcrossEntries|TestServiceCooperativeShutdownAcrossEntries)$' -timeout 240s ./integration/policy 2>&1 | tee "${RELEASE_EVIDENCE}/installed-policy.log"
+      - name: Five-minute mixed-protocol lifecycle resource and recovery check
         if: inputs.resource_check && matrix.target == 'linux-amd64'
         working-directory: workspace/fastls-rpc
         env:
-          FASTLS_H3_RESOURCE_SECONDS: '300'
+          FASTLS_LIFECYCLE_RESOURCE_SECONDS: '300'
         shell: bash
         run: |
           set -euo pipefail
-          go test -v -count=1 -tags policy_e2e -run '^TestServiceH3ResourceRecovery$' -timeout 420s ./integration/policy 2>&1 | tee "${RELEASE_EVIDENCE}/h3-resource.log"
+          go test -v -count=1 -tags policy_e2e -run '^TestServiceLifecycleResourceRecovery$' -timeout 420s ./integration/policy 2>&1 | tee "${RELEASE_EVIDENCE}/lifecycle-resource.log"
       - name: Stage compact verification evidence
         if: always()
         shell: bash

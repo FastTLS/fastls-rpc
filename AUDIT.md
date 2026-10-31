@@ -60,3 +60,6 @@ and response-controller forwarding. Cross-repository tests run real Fetch,
 JSON-RPC, gRPC and MITM processes with success, truncation, decoding failure,
 timeouts, cancellation, overload and message limits. Windows validates API
 shutdown separately; POSIX additionally checks actual CLI signal-and-drain.
+
+
+启用 `-shutdown-cancel-after` 时，审计回收与请求清理共用五秒绝对停机期限；审计自身期限只能缩短等待，失败仍非零退出。默认关闭时原独立审计预算保持，见 [停机契约](SHUTDOWN.md)。

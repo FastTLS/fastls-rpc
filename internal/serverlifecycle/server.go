@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"net"
 	"net/http"
 	"time"
@@ -19,7 +20,11 @@ func ServeHTTP(ctx context.Context, listener net.Listener, server *http.Server) 
 	return serveHTTP(ctx, listener, server, shutdownTimeout)
 }
 
-func serveHTTP(ctx context.Context, listener net.Listener, server *http.Server, timeout time.Duration) error {
+func ServeHTTPWithController(ctx context.Context, listener net.Listener, server *http.Server, owner *shutdown.Controller) error {
+	return serveHTTP(ctx, listener, server, shutdownTimeout, owner)
+}
+
+func serveHTTP(ctx context.Context, listener net.Listener, server *http.Server, timeout time.Duration, owners ...*shutdown.Controller) error {
 	if ctx == nil {
 		return errors.New("nil server context")
 	}
@@ -30,15 +35,24 @@ func serveHTTP(ctx context.Context, listener net.Listener, server *http.Server, 
 		return errors.New("shutdown timeout must be positive")
 	}
 	defer closeConnections(listener)
+	var owner *shutdown.Controller
+	if len(owners) > 0 {
+		owner = owners[0]
+	}
 	shutdownResult := make(chan error, 1)
 	stopCancellation := context.AfterFunc(ctx, func() {
-		shutdownContext, cancel := context.WithTimeout(context.Background(), timeout)
+		owner.Begin()
+		end := time.Now().Add(timeout)
+		if shared, ok := owner.Deadline(); ok {
+			end = shared
+		}
+		shutdownContext, cancel := context.WithDeadline(context.Background(), end)
 		defer cancel()
 		shutdownErr := server.Shutdown(shutdownContext)
 		if shutdownErr != nil {
 			shutdownErr = errors.Join(shutdownErr, server.Close())
 		}
-		shutdownResult <- shutdownErr
+		shutdownResult <- errors.Join(shutdownErr, owner.Wait(shutdownContext))
 	})
 	err := server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -56,7 +70,11 @@ func ServeGRPC(ctx context.Context, listener net.Listener, server *grpc.Server) 
 	return serveGRPC(ctx, listener, server, shutdownTimeout)
 }
 
-func serveGRPC(ctx context.Context, listener net.Listener, server *grpc.Server, timeout time.Duration) error {
+func ServeGRPCWithController(ctx context.Context, listener net.Listener, server *grpc.Server, owner *shutdown.Controller) error {
+	return serveGRPC(ctx, listener, server, shutdownTimeout, owner)
+}
+
+func serveGRPC(ctx context.Context, listener net.Listener, server *grpc.Server, timeout time.Duration, owners ...*shutdown.Controller) error {
 	if ctx == nil {
 		return errors.New("nil server context")
 	}
@@ -69,7 +87,7 @@ func serveGRPC(ctx context.Context, listener net.Listener, server *grpc.Server, 
 	defer closeConnections(listener)
 	shutdownResult := make(chan error, 1)
 	stopCancellation := context.AfterFunc(ctx, func() {
-		shutdownResult <- stopGRPCWithConnections(server, listener, timeout)
+		shutdownResult <- stopGRPCWithConnections(server, listener, timeout, owners...)
 	})
 	err := server.Serve(listener)
 	if errors.Is(err, grpc.ErrServerStopped) {
@@ -91,21 +109,34 @@ func closeConnections(listener net.Listener) {
 	}
 }
 
-func stopGRPCWithConnections(server *grpc.Server, listener net.Listener, timeout time.Duration) error {
+func stopGRPCWithConnections(server *grpc.Server, listener net.Listener, timeout time.Duration, owners ...*shutdown.Controller) error {
+	var owner *shutdown.Controller
+	if len(owners) > 0 {
+		owner = owners[0]
+	}
+	owner.Begin()
+	end := time.Now().Add(timeout)
+	if shared, ok := owner.Deadline(); ok {
+		end = shared
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), end)
+	defer cancel()
 	done := make(chan struct{})
 	go func() {
 		server.GracefulStop()
 		close(done)
 	}()
-	timer := time.NewTimer(timeout)
+	timer := time.NewTimer(time.Until(end))
 	defer timer.Stop()
 	select {
 	case <-done:
-		return nil
+		return owner.Wait(ctx)
 	case <-timer.C:
 		closeConnections(listener)
-		server.Stop()
-		<-done
+		// Stop may wait on a mutex held by GracefulStop and an uncooperative
+		// handler. The CLI must still return a forced-shutdown error on time.
+		go server.Stop()
+		// A handler ignoring cancellation must not make the forced path unbounded.
 		return fmt.Errorf("gRPC graceful shutdown exceeded %s", timeout)
 	}
 }

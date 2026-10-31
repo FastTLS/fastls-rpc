@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/FastTLS/fastls-rpc/internal/audit"
+	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"io"
 	"log"
 	"net"
@@ -20,6 +21,7 @@ import (
 	fastls "github.com/FastTLS/fastls"
 	"github.com/FastTLS/fastls-rpc/internal/fetchservice"
 	"github.com/FastTLS/fastls-rpc/internal/ingress"
+	"github.com/FastTLS/fastls-rpc/internal/responsecontract"
 	"github.com/FastTLS/fastls-rpc/internal/serverlifecycle"
 	"github.com/gin-gonic/gin"
 )
@@ -238,6 +240,7 @@ func main() {
 		policyFile     string
 		h3CAFile       string
 		auditConfig    audit.Config
+		shutdownConfig shutdown.Config
 		ingressConfig  ingress.HTTPConfig
 	)
 
@@ -251,6 +254,7 @@ func main() {
 	flag.StringVar(&policyFile, "address-policy", "", "Trusted address policy JSON file; unsupported cores refuse startup")
 	ingressConfig.BindFlags(flag.CommandLine)
 	auditConfig.BindFlags(flag.CommandLine)
+	shutdownConfig.BindFlags(flag.CommandLine)
 
 	flag.BoolVar(&debug, "debug", false, "启用 Debug 模式，显示详细的调试日志")
 	flag.BoolVar(&debug, "d", false, "启用 Debug 模式 (debug 的缩写)")
@@ -278,7 +282,12 @@ func main() {
 	}
 
 	// 设置最大CPU核心数
-	if err := audit.Run(auditConfig, func(sink *audit.Sink) error {
+	owner, err := shutdown.New(shutdownConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer owner.Close()
+	if err := audit.RunWithDeadline(auditConfig, func(sink *audit.Sink) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 
 		// 创建RPC服务器
@@ -304,7 +313,7 @@ func main() {
 			return err
 		}
 
-		server.Handler = sink.HTTP("jsonrpc", server.Handler)
+		server.Handler = owner.HTTP(sink.HTTP("jsonrpc", server.Handler))
 		// 启动服务器
 		listener, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -322,14 +331,14 @@ func main() {
 		defer stopSignals()
 		log.Printf("RPC服务启动在端口 %s", listener.Addr())
 		log.Printf("RPC端点: http://%s/rpc", listener.Addr())
-		if err := serverlifecycle.ServeHTTP(shutdownContext, limited, server); err != nil {
+		if err := serverlifecycle.ServeHTTPWithController(shutdownContext, limited, server, owner); err != nil {
 			return fmt.Errorf("服务器启动失败: %w", err)
 		}
 		if shutdownContext.Err() != nil {
 			log.Printf("RPC服务已安全停止")
 		}
 		return nil
-	}); err != nil {
+	}, owner.Deadline); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -359,7 +368,12 @@ func rpcRequestBodyLimit(limit int64) gin.HandlerFunc {
 					message = "Invalid Request"
 					detail = fmt.Sprintf("request body exceeds %d byte limit", tooLarge.Limit)
 				}
-				audit.Result(c.Request.Context(), "", 0, map[bool]string{true: "request_too_large", false: "invalid_request"}[status == 413], "")
+				classification := map[bool]string{true: "request_too_large", false: "invalid_request"}[status == 413]
+				phase := ""
+				if cause := c.Request.Context().Err(); cause != nil {
+					classification, phase = responsecontract.Code(cause, classification)
+				}
+				audit.Result(c.Request.Context(), "", 0, classification, phase)
 				c.AbortWithStatusJSON(status, JSONRPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: code, Message: message, Data: detail}})
 				return
 			}

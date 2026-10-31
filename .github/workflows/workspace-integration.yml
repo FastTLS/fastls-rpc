@@ -53,7 +53,7 @@ permissions:
 
 env:
   GOWORK: 'off'
-  FETCH_REF: ${{ inputs.fetch_ref || '486973c7601dac79a511b1157a0cbf0274be1213' }}
+  FETCH_REF: ${{ inputs.fetch_ref || '8358290e6270e5eacce3e4b787e79d40ff3b52ee' }}
   MITM_REF: ${{ inputs.mitm_ref || 'a82880d7bf1f3051972cccf93fb5c04f251a4ac9' }}
 
 jobs:

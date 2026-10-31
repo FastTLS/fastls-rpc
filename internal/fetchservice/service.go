@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/FastTLS/fastls-rpc/internal/h3config"
+	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"maps"
 	"net/http"
 
@@ -156,6 +157,10 @@ func Fetch(ctx context.Context, client fastls.Fastls, params Params) (Result, er
 
 	ctx, cancel := responsecontract.RequestContext(ctx, options.Timeout)
 	defer cancel()
+	if err := shutdown.Check(ctx); err != nil {
+		code, phase := responsecontract.Code(err, "request_error")
+		return Result{Error: responsecontract.ErrorMessage(err), ErrorCode: code, TimeoutPhase: phase}, nil
+	}
 	response, requestErr := client.DoContext(ctx, params.URL, options, method)
 	defer response.Client.CloseIdleConnections()
 	if response.Body != nil {
