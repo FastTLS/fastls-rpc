@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/FastTLS/fastls-rpc/internal/shutdown"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/stats"
 )
 
 func TestShutdownRetainsDecoderAndRejectsLateUpstream(t *testing.T) {
@@ -89,3 +91,61 @@ func TestShutdownRetainsDecoderAndRejectsLateUpstream(t *testing.T) {
 		t.Fatal("canceled decode issued upstream request")
 	}
 }
+
+func TestCooperativeContextSurvivesLargeResponseWrite(t *testing.T) {
+	const size = 2 << 20
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(strings.Repeat("x", size))) }))
+	defer upstream.Close()
+	owner, _ := shutdown.New(shutdown.Config{CancelAfter: time.Second})
+	defer owner.Close()
+	service := NewGRPCServer()
+	service.shutdown = owner
+	observer := responseContextObserver{done: make(chan error, 1)}
+	server, err := service.newTransportServerWithIngress(grpcIngressConfig{}, grpc.StatsHandler(observer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Stop()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(listener)
+	connection, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(8<<20)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	response, err := pb.NewFastlsServiceClient(connection).Fetch(ctx, &pb.FetchRequest{Url: upstream.URL})
+	if err != nil {
+		t.Fatal("normal large response interrupted before transport completion", err)
+	}
+	if !response.Ok || len(response.Body) != size {
+		t.Fatal("incomplete large response")
+	}
+	select {
+	case err := <-observer.done:
+		if err != nil {
+			t.Fatal("RPC context canceled before response serialization/send completed", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("missing response observation")
+	}
+}
+
+type responseContextObserver struct{ done chan error }
+
+func (s responseContextObserver) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
+	return ctx
+}
+func (s responseContextObserver) HandleRPC(ctx context.Context, event stats.RPCStats) {
+	if _, ok := event.(*stats.OutPayload); ok {
+		s.done <- ctx.Err()
+	}
+}
+func (s responseContextObserver) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
+	return ctx
+}
+func (s responseContextObserver) HandleConn(context.Context, stats.ConnStats) {}

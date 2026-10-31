@@ -20,6 +20,10 @@ on:
         description: Full released RPC source SHA (may differ from smoke tooling)
         required: true
         type: string
+      rpc_version:
+        description: Exact RPC release tag when different from Fetch
+        type: string
+        default: v0.3.1
       mitm_version:
         description: Unchanged pinned MITM release version
         type: string
@@ -50,6 +54,7 @@ jobs:
       FASTLS_POLICY_GRAPH: formal
       RELEASE_VERSION: ${{ inputs.release_version }}
       MITM_RELEASE_VERSION: ${{ inputs.mitm_version }}
+      RPC_RELEASE_VERSION: ${{ inputs.rpc_version || inputs.release_version }}
       RELEASE_TARGET: ${{ matrix.target }}
       FETCH_SHA: ${{ inputs.fetch_ref }}
       RPC_SHA: ${{ inputs.rpc_ref }}

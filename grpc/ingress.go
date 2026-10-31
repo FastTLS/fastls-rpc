@@ -45,7 +45,7 @@ func (c grpcIngressConfig) validate() error {
 	return ingress.ValidateDuration("rpc-timeout", c.RPCTimeout)
 }
 
-func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*grpc.Server, error) {
+func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig, additional ...grpc.ServerOption) (*grpc.Server, error) {
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 	if err != nil {
 		return nil, err
 	}
-	var options []grpc.ServerOption
+	options := append([]grpc.ServerOption(nil), additional...)
 	if config.MaxHeaderBytes > 0 {
 		options = append(options, grpc.MaxHeaderListSize(uint32(config.MaxHeaderBytes)))
 	}
@@ -68,7 +68,6 @@ func (s *GRPCServer) newTransportServerWithIngress(config grpcIngressConfig) (*g
 		if admissionEnabled || s.shutdown.Enabled() {
 			options = append(options, grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 				defer releaseAdmission(ctx)
-				defer shutdown.Release(ctx)
 				response, err := handler(ctx, request)
 				if ctx.Err() != nil {
 					return nil, status.FromContextError(ctx.Err()).Err()

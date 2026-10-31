@@ -35,7 +35,7 @@ def main():
     for name,sha in [('fastls-fetch',os.environ['FETCH_SHA']),('fastls-rpc',os.environ['RPC_SHA']),('fastls-mitm',os.environ['MITM_SHA'])]:
         if not re.fullmatch('[0-9a-f]{40}',sha):
             raise SystemExit('full immutable source SHA required')
-        version=os.environ.get('MITM_RELEASE_VERSION','v0.1.2') if name=='fastls-mitm' else release_version
+        version=(os.environ.get('MITM_RELEASE_VERSION','v0.1.2') if name=='fastls-mitm' else os.environ.get('RPC_RELEASE_VERSION',release_version) if name=='fastls-rpc' else release_version)
         if not re.fullmatch(r'v\d+\.\d+\.\d+',version):
             raise SystemExit('invalid component release version')
         directory=out/name

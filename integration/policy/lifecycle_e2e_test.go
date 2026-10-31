@@ -140,6 +140,9 @@ func TestServiceCooperativeShutdownAcrossEntries(t *testing.T) {
 							if err != nil || len(events) == 0 {
 								t.Fatal("missing audit completions", err)
 							}
+							if mode != "cancel" && strings.Contains(string(events), `"error_code":"cancelled"`) {
+								t.Fatal("successful request was audited as canceled", string(events))
+							}
 							if mode == "cancel" && !strings.Contains(string(events), `"error_code":"cancelled"`) {
 								t.Fatal("cancellation missing from audit", string(events))
 							}
