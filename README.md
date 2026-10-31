@@ -6,7 +6,7 @@ FastTLS 的 RPC 服务集合，同一仓库提供 JSON-RPC 2.0 和 gRPC 两种�
 
 > 当前状态：[`v0.1.2`](https://github.com/FastTLS/fastls-rpc/releases/tag/v0.1.2) 正式版。正式产物只在 GitHub Releases 发布；其他软件包、镜像和应用商店不在发布范围内。
 
-当前开发分支为JSON-RPC/gRPC增加完整多值响应头、按需附带的原始正文Base64、错误分类和可选响应字节/并发上限；另提供max-request-bytes启动参数，默认4MiB，可配置1字节至64MiB，0选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf新增请求字段15与响应字段9–12，旧字段保持不变；这些变更尚未发布。
+v0.1.2 的 JSON-RPC/gRPC 提供完整多值响应头、按需附带的原始正文 Base64、错误分类和可选响应字节/并发上限；另提供 max-request-bytes 启动参数，默认 4 MiB，可配置 1 字节至 64 MiB，0 选择默认值，详见[响应契约说明](RESPONSE_CONTRACT.md)。Protobuf 请求字段 15 与响应字段 9–12 保留兼容，旧字段不变。
 
 S1 开发源码新增 [接入资源限额](INGRESS.md)：TCP 总名额、HTTP 正文/gRPC 消息解码之前的名额、头部和时限配置，以及每连接 HTTP/2 流限制；与原 fetch 执行名额分别计数，默认兼容现有行为。
 

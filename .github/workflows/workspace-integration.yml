@@ -13,6 +13,7 @@ on:
       - 'integration/workspace/**'
       - 'integration/policy/**'
       - '.github/workflows/address-policy-integration.yml'
+      - '!**/*.md'
   pull_request:
     paths:
       - '.github/workflows/workspace-integration.yml'
@@ -24,6 +25,7 @@ on:
       - 'integration/workspace/**'
       - 'integration/policy/**'
       - '.github/workflows/address-policy-integration.yml'
+      - '!**/*.md'
   workflow_dispatch:
     inputs:
       development_policy:

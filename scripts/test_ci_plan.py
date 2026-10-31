@@ -1,4 +1,6 @@
 import copy
+import fnmatch
+import re
 import unittest
 from pathlib import Path
 from ci_plan import choose, gate, native_run_valid, native_recipe, CURRENT, NEXT
@@ -52,6 +54,33 @@ class ValidationPlan(unittest.TestCase):
         self.assertEqual(choose('push', 'refs/heads/main', 'auto', paths+['go.mod'])['mode'], 'candidate')
         self.assertEqual(choose('push', 'refs/tags/v0.1.3', 'auto', paths)['mode'], 'candidate')
         self.assertEqual(choose('workflow_dispatch', 'refs/heads/main', 'candidate', paths)['mode'], 'candidate')
+
+    def test_documentation_mixed_with_controlled_coordination_preserves_reuse(self):
+        paths=['README.md','DEVELOPMENT.md','integration/workspace/README.md',
+               '.github/workflows/workspace-integration.yml','scripts/ci_plan.py','scripts/test_ci_plan.py']
+        self.assertEqual(choose('push','refs/heads/main','auto',paths)['mode'],'coordination')
+        for production in ['go.mod','go.sum','grpc/rpc_server.go','internal/executor.go','scripts/unknown.py']:
+            self.assertEqual(choose('push','refs/heads/main','auto',paths+[production])['mode'],'candidate')
+        self.assertEqual(choose('push','refs/heads/main','auto',['README.md'])['mode'],'docs')
+        self.assertEqual(choose('push','refs/tags/v0.1.2','auto',paths)['mode'],'candidate')
+
+    def test_workspace_paths_ignore_documentation_and_keep_protocol_inputs(self):
+        text=(Path(__file__).resolve().parents[1]/'.github/workflows/workspace-integration.yml').read_text()
+        for event,end in [('push','pull_request'),('pull_request','workflow_dispatch')]:
+            block=text.split('  '+event+':',1)[1].split('  '+end+':',1)[0]
+            patterns=re.findall(r"^      - '([^']+)'",block,re.M)
+            def selected(path):
+                result=False
+                for pattern in patterns:
+                    negative=pattern.startswith('!')
+                    if fnmatch.fnmatchcase(path,pattern[1:] if negative else pattern): result=not negative
+                return result
+            self.assertFalse(selected('integration/workspace/README.md'))
+            self.assertFalse(selected('integration/policy/notes.md'))
+            self.assertFalse(selected('grpc/README.md'))
+            for path in ['go.mod','go.sum','grpc/rpc_server.go','internal/servicepolicy/policy.go',
+                         'integration/policy/policy_e2e_test.go','.github/workflows/workspace-integration.yml']:
+                self.assertTrue(selected(path),path)
 
     def test_unknown_plan_cannot_authorize_skips(self):
         with self.assertRaises(ValueError): gate(dict(mode='unknown', quality=False), {})

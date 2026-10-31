@@ -77,7 +77,10 @@ def choose(event, ref, requested, paths):
         '.github/workflows/address-policy-integration.yml',
         'integration/policy/policy_e2e_test.go', 'integration/policy/mitm_gateway_e2e_test.go',
     }
-    coordination = paths is not None and bool(paths) and all(p in coordination_files for p in paths)
+    def documentation(path):
+        return path.endswith(('.md', '.rst', '.txt')) or path in ('LICENSE', 'NOTICE')
+    coordination = paths is not None and bool(paths) and any(p in coordination_files for p in paths) and all(
+        p in coordination_files or documentation(p) for p in paths)
     if coordination:
         root = Path(__file__).resolve().parents[1]
         coordination = all(not p.endswith('.go') or (root/p).is_file() and
