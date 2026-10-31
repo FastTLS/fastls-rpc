@@ -100,7 +100,7 @@ def main():
                   event.get('inputs', {}).get('validation', 'auto'), paths)
     if plan['mode'] == 'docs' and docs_are_inputs(Path.cwd(), head or 'HEAD'):
         plan = choose(os.environ['GITHUB_EVENT_NAME'], os.environ['GITHUB_REF'], 'candidate', paths)
-    if plan['mode'] == 'coordination':
+    if plan['mode'] in ('coordination','docs'):
         proof = native_baseline()
         if proof:
             plan['native_baseline'] = proof

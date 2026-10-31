@@ -117,3 +117,20 @@ class ValidationPlan(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class UnverifiedDocumentationTests(unittest.TestCase):
+    def test_docs_after_unverified_runtime_restore_candidate(self):
+        import ci_plan,os,json,tempfile
+        from unittest.mock import patch
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            event=Path(tmp)/'event.json';event.write_text(json.dumps({'before':'a'*40}),encoding='utf-8')
+            for baseline in [None,{'verified':True,'sha':'b'*40,'run_id':1}]:
+                output=Path(tmp)/('missing' if baseline is None else 'verified')
+                env={'GITHUB_EVENT_PATH':str(event),'GITHUB_EVENT_NAME':'push','GITHUB_REF':'refs/heads/main','GITHUB_SHA':'c'*40,'GITHUB_OUTPUT':str(output)}
+                with patch.dict(os.environ,env),patch('sys.argv',['ci_plan.py']),patch.object(ci_plan.subprocess,'check_output',return_value='SHUTDOWN.md\n'),patch.object(ci_plan,'docs_are_inputs',return_value=False),patch.object(ci_plan,'native_baseline',return_value=baseline):
+                    ci_plan.main()
+                plan=json.loads(output.read_text().splitlines()[0].split('=',1)[1])
+                self.assertEqual(plan['mode'],'candidate' if baseline is None else 'docs')
+                self.assertEqual(len(plan['matrix']['include']),6 if baseline is None else 0)
