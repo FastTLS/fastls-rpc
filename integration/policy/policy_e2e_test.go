@@ -98,8 +98,8 @@ func policyGraph(t *testing.T) string {
 		t.Fatal("formal policy tests require GOWORK=off")
 	}
 	rpc, root := directories(t)
-	expected := map[string]string{"github.com/FastTLS/fastls": "v0.1.3-0.20261030152832-0dc4eea0f32e", "github.com/FastTLS/ftransport": "v0.1.2-0.20261030131050-d9812320808e",
-		"github.com/FastTLS/imitate": "v0.1.2-0.20261030131552-ebd18547d28a", "github.com/FastTLS/fastls/profile": "v0.1.1-0.20261030130219-e9e40f15c9ac"}
+	expected := map[string]string{"github.com/FastTLS/fastls": "v0.2.1", "github.com/FastTLS/ftransport": "v0.1.2",
+		"github.com/FastTLS/imitate": "v0.1.2", "github.com/FastTLS/fastls/profile": "v0.1.1"}
 	for _, directory := range []string{rpc, policyRepository(root, "fastls-fetch"), policyRepository(root, "fastls-mitm")} {
 		args := []string{"list", "-m", "-json", "github.com/FastTLS/fastls", "github.com/FastTLS/ftransport", "github.com/FastTLS/imitate", "github.com/FastTLS/fastls/profile"}
 		command := exec.Command("go", args...)
