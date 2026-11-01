@@ -6,7 +6,7 @@ on:
       release_version:
         description: Exact service release tag
         required: true
-        default: v0.3.0
+        default: v0.3.1
         type: string
       fetch_ref:
         description: Full released Fetch source SHA
@@ -23,11 +23,11 @@ on:
       rpc_version:
         description: Exact RPC release tag when different from Fetch
         type: string
-        default: v0.3.1
+        default: v0.3.2
       mitm_version:
-        description: Unchanged pinned MITM release version
+        description: Exact MITM release tag
         type: string
-        default: v0.1.2
+        default: v0.1.3
       resource_check:
         description: Run five-minute resources only for changed resource mechanisms or explicit acceptance
         type: boolean

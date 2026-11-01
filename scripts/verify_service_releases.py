@@ -1,5 +1,6 @@
 """Download, authenticate and inspect the exact release executables; no builds."""
 import hashlib
+import base64
 import json
 import os
 from pathlib import Path
@@ -10,12 +11,18 @@ import tarfile
 import zipfile
 from release_download import download
 
-MODULES = {
-    'github.com/FastTLS/fastls':'v0.1.3-0.20261030152832-0dc4eea0f32e',
-    'github.com/FastTLS/fastls/profile':'v0.1.1-0.20261030130219-e9e40f15c9ac',
-    'github.com/FastTLS/ftransport':'v0.1.2-0.20261030131050-d9812320808e',
-    'github.com/FastTLS/imitate':'v0.1.2-0.20261030131552-ebd18547d28a',
-}
+MODULES = {'github.com/FastTLS/' + name for name in ('fastls', 'fastls/profile', 'ftransport', 'imitate')}
+
+
+def source_modules(text, repository):
+    if not re.search(r'(?m)^module\s+github\.com/FastTLS/' + re.escape(repository) + r'\s*$', text) or re.search(r'(?m)^\s*replace\b', text):
+        raise ValueError('Untrusted or replaced release module')
+    pairs = re.findall(r'(?m)^\s*(?:require\s+)?(github\.com/FastTLS/[\w/-]+)\s+(\S+)', text)
+    selected = [(name, version) for name, version in pairs if name in MODULES]
+    if len(selected) != len(MODULES) or {name for name, _ in selected} != MODULES or any(
+            not re.fullmatch(r'v\d+\.\d+\.\d+(?:-(?:0\.)?\d{14}-[a-f0-9]{12})?', version) for _, version in selected):
+        raise ValueError('Release source must pin all four immutable modules')
+    return dict(selected)
 
 
 def run(*args):
@@ -41,6 +48,13 @@ def main():
         directory=out/name
         directory.mkdir(exist_ok=True)
         repository='FastTLS/'+name
+        # Derive pins from the exact authenticated archive source, so a tool
+        # update cannot silently accept an old fixed graph or require a rebuild.
+        source = json.loads(run('gh','api','repos/'+repository+'/contents/go.mod?ref='+sha))
+        if source.get('encoding') != 'base64' or source.get('path') != 'go.mod':
+            raise SystemExit('Invalid immutable source module response')
+        source_text = base64.b64decode(source['content']).decode('utf-8')
+        modules = source_modules(source_text, name)
         ext='.zip' if target.startswith('windows-') else '.tar.gz'
         archive=name+'-'+version+'-'+target+ext
         release=json.loads(run('gh','api','repos/'+repository+'/releases/tags/'+version))
@@ -80,7 +94,7 @@ def main():
         for component in components:
             executable=contents/(component+('.exe' if target.startswith('windows-') else ''))
             module_info=run('go','version','-m',str(executable))
-            for module,pin in MODULES.items():
+            for module,pin in modules.items():
                 if not re.search(r'\bdep\s+'+re.escape(module)+r'\s+'+re.escape(pin)+r'\s',module_info):
                     raise SystemExit('executable module mismatch: '+module)
             for setting in ['vcs.revision='+sha,'GOOS='+target.split('-')[0],'GOARCH='+target.split('-')[1]]:

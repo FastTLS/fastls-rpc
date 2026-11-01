@@ -1,5 +1,19 @@
 import unittest
 from release_gate import accepted
+from verify_service_releases import source_modules
+
+
+class ReleasedModuleIdentity(unittest.TestCase):
+    def test_pins_follow_the_exact_released_source_not_tooling_history(self):
+        text='module github.com/FastTLS/fastls-rpc\n\nrequire (\n'
+        text+=''.join(f'github.com/FastTLS/{name} {version}\n' for name,version in
+            [('fastls','v0.2.1'),('fastls/profile','v0.1.1'),('ftransport','v0.1.2'),('imitate','v0.1.2')]) + ')\n'
+        result=source_modules(text,'fastls-rpc')
+        self.assertEqual(result['github.com/FastTLS/fastls'],'v0.2.1')
+        for altered in [text.replace('v0.2.1','main'),text.replace('fastls-rpc','other'),
+                        text+'replace example => ./local\n',text.replace('github.com/FastTLS/imitate v0.1.2\n',''),
+                        text+'require github.com/FastTLS/imitate v0.1.2\n']:
+            with self.assertRaises(ValueError):source_modules(altered,'fastls-rpc')
 
 
 class ReleaseGateTests(unittest.TestCase):
