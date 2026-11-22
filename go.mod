@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/FastTLS/fastls v0.2.1
+	github.com/FastTLS/fastls/profile v0.1.1
 	github.com/FastTLS/imitate v0.1.3
 	github.com/andybalholm/brotli v1.2.0
 	github.com/gin-gonic/gin v1.11.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/FastTLS/fastls/profile v0.1.1 // indirect
 	github.com/FastTLS/ftransport v0.1.2 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
