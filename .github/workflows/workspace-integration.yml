@@ -53,8 +53,8 @@ permissions:
 
 env:
   GOWORK: 'off'
-  FETCH_REF: ${{ inputs.fetch_ref || 'f60c3e01a2f02d2bfefe27d4d7d12136eb0417dc' }}
-  MITM_REF: ${{ inputs.mitm_ref || 'c4de9924b6beb4407067f8c95caa819ffea926d4' }}
+  FETCH_REF: ${{ inputs.fetch_ref || 'f15465ba578dd69f69bfbc6b77ae6fa4ce1b7d8f' }}
+  MITM_REF: ${{ inputs.mitm_ref || '58c90749b84f264ae34782e5f87f8262b728d404' }}
 
 jobs:
   development-policy:

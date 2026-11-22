@@ -99,7 +99,7 @@ func policyGraph(t *testing.T) string {
 	}
 	rpc, root := directories(t)
 	expected := map[string]string{"github.com/FastTLS/fastls": "v0.2.1", "github.com/FastTLS/ftransport": "v0.1.2",
-		"github.com/FastTLS/imitate": "v0.1.2", "github.com/FastTLS/fastls/profile": "v0.1.1"}
+		"github.com/FastTLS/imitate": "v0.1.3", "github.com/FastTLS/fastls/profile": "v0.1.1"}
 	for _, directory := range []string{rpc, policyRepository(root, "fastls-fetch"), policyRepository(root, "fastls-mitm")} {
 		args := []string{"list", "-m", "-json", "github.com/FastTLS/fastls", "github.com/FastTLS/ftransport", "github.com/FastTLS/imitate", "github.com/FastTLS/fastls/profile"}
 		command := exec.Command("go", args...)

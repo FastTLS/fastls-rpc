@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/FastTLS/fastls v0.2.1
-	github.com/FastTLS/imitate v0.1.2
+	github.com/FastTLS/imitate v0.1.3
 	github.com/andybalholm/brotli v1.2.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/klauspost/compress v1.18.7
